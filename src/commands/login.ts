@@ -11,6 +11,7 @@ import { clearUser } from '../services/auth';
 export function registerLogin(
   context: vscode.ExtensionContext,
   authService: AuthService,
+  onReload: () => void,
 ): vscode.Disposable {
   const loginDisposable = vscode.commands.registerCommand(
     'unsw-practice.login',
@@ -27,6 +28,7 @@ export function registerLogin(
       await authService.clearToken();
       await clearUser(context.globalState);
       vscode.window.showInformationMessage('UNSW Practice: Logged out successfully.');
+      onReload();
     },
   );
 

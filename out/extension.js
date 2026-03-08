@@ -123,6 +123,12 @@ var ProblemTreeProvider = class {
     this.state = "loaded";
     this._onDidChangeTreeData.fire();
   }
+  /** Return how many published problems exist and how many are solved. */
+  getSolvedCount() {
+    const published = this.problems.filter((p) => p.isPublished);
+    const solved = published.filter((p) => this.progressMap.get(p.id) === "solved").length;
+    return { solved, total: published.length };
+  }
   /** Switch to error state and redraw. */
   setError() {
     this.state = "error";
@@ -652,7 +658,7 @@ async function clearUser(globalState) {
 }
 
 // src/commands/login.ts
-function registerLogin(context, authService) {
+function registerLogin(context, authService, onReload) {
   const loginDisposable = vscode5.commands.registerCommand(
     "unsw-practice.login",
     () => {
@@ -667,6 +673,7 @@ function registerLogin(context, authService) {
       await authService.clearToken();
       await clearUser(context.globalState);
       vscode5.window.showInformationMessage("UNSW Practice: Logged out successfully.");
+      onReload();
     }
   );
   return vscode5.Disposable.from(loginDisposable, logoutDisposable);
@@ -681,13 +688,19 @@ function activate(context) {
     treeDataProvider: treeProvider,
     showCollapseAll: false
   });
+  let statusBar;
   async function loadProblems() {
     try {
+      const token = await authService.getToken();
       const [problems, progress] = await Promise.all([
-        fetchProblems(),
-        fetchUserProgress("")
+        fetchProblems(token),
+        token ? fetchUserProgress(token) : Promise.resolve([])
       ]);
       treeProvider.setProblems(problems, progress);
+      const { solved, total } = treeProvider.getSolvedCount();
+      if (statusBar) {
+        statusBar.text = `$(book) UNSW: ${solved}/${total} solved`;
+      }
     } catch (error) {
       treeProvider.setError();
       vscode6.window.showErrorMessage(
@@ -705,8 +718,14 @@ function activate(context) {
     refreshDisposable,
     registerOpenProblem(context, webviewProvider),
     registerSubmitCode(),
-    registerLogin(context, authService)
+    registerLogin(context, authService, () => void loadProblems())
   );
+  statusBar = vscode6.window.createStatusBarItem(vscode6.StatusBarAlignment.Left, 100);
+  statusBar.command = "unsw-practice.refresh";
+  statusBar.text = "$(book) UNSW: 0/0 solved";
+  statusBar.tooltip = "Click to refresh UNSW Practice problems";
+  statusBar.show();
+  context.subscriptions.push(statusBar);
 }
 function deactivate() {
 }

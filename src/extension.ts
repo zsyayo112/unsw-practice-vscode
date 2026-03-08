@@ -26,14 +26,21 @@ export function activate(context: vscode.ExtensionContext): void {
     showCollapseAll: false,
   });
 
+  let statusBar: vscode.StatusBarItem | undefined;
+
   // ── Data loading ───────────────────────────────────────────────────────────
   async function loadProblems(): Promise<void> {
     try {
+      const token = await authService.getToken();
       const [problems, progress] = await Promise.all([
-        fetchProblems(),
-        fetchUserProgress(''),
+        fetchProblems(token),
+        token ? fetchUserProgress(token) : Promise.resolve([]),
       ]);
       treeProvider.setProblems(problems, progress);
+      const { solved, total } = treeProvider.getSolvedCount();
+      if (statusBar) {
+        statusBar.text = `$(book) UNSW: ${solved}/${total} solved`;
+      }
     } catch (error) {
       treeProvider.setError();
       vscode.window.showErrorMessage(
@@ -56,8 +63,16 @@ export function activate(context: vscode.ExtensionContext): void {
     refreshDisposable,
     registerOpenProblem(context, webviewProvider),
     registerSubmitCode(),
-    registerLogin(context, authService),
+    registerLogin(context, authService, () => void loadProblems()),
   );
+
+  // ── Status bar ─────────────────────────────────────────────────────────────
+  statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  statusBar.command = 'unsw-practice.refresh';
+  statusBar.text = '$(book) UNSW: 0/0 solved';
+  statusBar.tooltip = 'Click to refresh UNSW Practice problems';
+  statusBar.show();
+  context.subscriptions.push(statusBar);
 }
 
 /**

@@ -61,7 +61,17 @@ TypeScript 配置（`tsconfig.json`）使用 `"module": "Preserve", "moduleResol
 
 ### ProblemWebviewProvider 面板模式
 
-单 `WebviewPanel` 实例在多题目间复用：已存在时调 `reveal()`，不存在时创建。切换题目时直接覆写 `panel.webview.html` 并 postMessage `load-problem`。CSP 允许 `script-src cdn.jsdelivr.net`（Monaco）和 `connect-src emkc.org`（Piston）。Monaco 版本固定：`monaco-editor@0.52.0`（通过 CDN，不打包）。
+单 `WebviewPanel` 实例在多题目间复用：已存在时调 `reveal()`，不存在时创建。切换题目时直接覆写 `panel.webview.html` 并 postMessage `load-problem`。Monaco 版本固定：`monaco-editor@0.52.0`（通过 CDN，不打包）。
+
+**CSP（`buildHtml()` 中设置）：**
+```
+default-src 'none';
+style-src   ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+script-src  'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+font-src    ${webview.cspSource} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+connect-src ${webview.cspSource} https://emkc.org https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+```
+注意：Monaco 在运行时动态注入 `<link>` 加载自身 CSS（`editor.main.css`），因此 `style-src` 必须包含 `cdn.jsdelivr.net`。`connect-src` 需要 `${webview.cspSource}` 才能加载本地 source map（`main.js.map`）。
 
 ### Extension ↔ WebView 消息总线
 
@@ -89,12 +99,24 @@ TypeScript 配置（`tsconfig.json`）使用 `"module": "Preserve", "moduleResol
 
 所有后端调用走 `fetchWithRetry`（10 秒超时 + 2 次网络重试，4xx/5xx 不重试），网络/HTTP 错误统一抛 `ApiError`（含 `statusCode?`）。
 
-### Monaco Editor
+### WebView 前端（src/webview/main.ts）
 
-从 CDN 加载（不打包）。在 `src/webview/main.ts` 中，AMD `require` 通过以下方式访问（避免与 `@types/node` 冲突）：
+UI 由 `buildLayout()` 注入骨架，`load-problem` 消息到达后 `renderProblem()` 填充内容：
+
+- **左栏**：题目标题 + 难度 badge + topic pills；三个 tab（Description / Hints / Solution 🔒）；Hints 用 `<details>` 渐进展示
+- **右栏**：工具栏（Python 3 badge / Run / Submit / Reset）+ Monaco 编辑器 + 结果面板
+- **localStorage**：编辑器内容自动保存到 `unsw-code-${slug}`，切换题目时恢复，Reset 按钮清除并还原 `starterCode`
+- **`isRunning` flag**：`loading` 消息控制按钮 disabled 并阻止重复提交
+- **结果面板**：Run 显示单条 `TestResult`；Submit 显示每条测试用例的 pass/fail + "🎉 Accepted!" banner
+
+### CDN 全局变量访问模式
+
+所有从 CDN 注入的全局变量（Monaco `require`、marked.js）统一通过 globalThis cast 访问，避免与 `@types/node` 冲突：
 ```typescript
 const monacoRequire = (globalThis as Record<string, unknown>)['require'] as MonacoLoader;
+const markedLib = (globalThis as Record<string, unknown>)['marked'] as { parse(md: string): string } | undefined;
 ```
+`marked@4` 从 CDN 加载（`https://cdn.jsdelivr.net/npm/marked@4/marked.min.js`），`markedLib` 可能为 `undefined`，`renderMarkdown()` 内有 fallback。
 
 ---
 

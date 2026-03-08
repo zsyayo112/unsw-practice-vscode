@@ -107,6 +107,13 @@ export class ProblemTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     this._onDidChangeTreeData.fire();
   }
 
+  /** Return how many published problems exist and how many are solved. */
+  getSolvedCount(): { solved: number; total: number } {
+    const published = this.problems.filter((p) => p.isPublished);
+    const solved = published.filter((p) => this.progressMap.get(p.id) === 'solved').length;
+    return { solved, total: published.length };
+  }
+
   /** Switch to error state and redraw. */
   setError(): void {
     this.state = 'error';
