@@ -9,9 +9,9 @@
 import type { Problem, TestCase, TestResult, SubmissionResult, UserProgress } from '../types/index';
 import { Difficulty, SubmissionStatus } from '../types/index';
 
-export const MOCK_MODE = true;
+export const MOCK_MODE = false;
 
-const API_BASE = 'https://api.unsw-practice.com/api/v1';
+const API_BASE = 'http://172.23.83.101:3000/api/v1';
 const JUDGE0_API = 'https://ce.judge0.com/submissions?base64_encoded=false&wait=true';
 const JUDGE0_PYTHON_ID = 71; // Python 3.8
 const PISTON_TIMEOUT_MS = 3000;
@@ -248,7 +248,8 @@ export async function fetchProblems(token?: string): Promise<Problem[]> {
     headers: authHeaders(token),
   });
   const json = (await response.json()) as { data: Problem[] };
-  return json.data;
+  // Backend only returns published problems and omits isPublished field
+  return json.data.map((p) => ({ ...p, isPublished: true }));
 }
 
 /**
@@ -267,7 +268,7 @@ export async function fetchProblem(slug: string, token?: string): Promise<Proble
     headers: authHeaders(token),
   });
   const json = (await response.json()) as { data: Problem };
-  return json.data;
+  return { ...json.data, isPublished: true };
 }
 
 /**
@@ -289,7 +290,7 @@ export async function submitSolution(params: {
   const response = await fetchWithRetry(`${API_BASE}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(params.token) },
-    body: JSON.stringify({ problemId: params.problemId, code: params.code }),
+    body: JSON.stringify({ problemId: params.problemId, code: params.code, language: 'python' }),
   });
   const json = (await response.json()) as { data: SubmissionResult };
   return json.data;

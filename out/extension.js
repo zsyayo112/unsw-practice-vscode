@@ -183,8 +183,8 @@ var ProblemTreeProvider = class {
 var vscode2 = __toESM(require("vscode"));
 
 // src/services/api.ts
-var MOCK_MODE = true;
-var API_BASE = "https://api.unsw-practice.com/api/v1";
+var MOCK_MODE = false;
+var API_BASE = "http://172.23.83.101:3000/api/v1";
 var JUDGE0_API = "https://ce.judge0.com/submissions?base64_encoded=false&wait=true";
 var JUDGE0_PYTHON_ID = 71;
 var PISTON_TIMEOUT_MS = 3e3;
@@ -397,7 +397,7 @@ async function fetchProblems(token) {
     headers: authHeaders(token)
   });
   const json = await response.json();
-  return json.data;
+  return json.data.map((p) => ({ ...p, isPublished: true }));
 }
 async function fetchProblem(slug, token) {
   if (MOCK_MODE) {
@@ -411,7 +411,7 @@ async function fetchProblem(slug, token) {
     headers: authHeaders(token)
   });
   const json = await response.json();
-  return json.data;
+  return { ...json.data, isPublished: true };
 }
 async function fetchUserProgress(token) {
   if (MOCK_MODE) {
