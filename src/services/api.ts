@@ -12,7 +12,8 @@ import { Difficulty, SubmissionStatus } from '../types/index';
 export const MOCK_MODE = true;
 
 const API_BASE = 'https://api.unsw-practice.com/api/v1';
-const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
+const JUDGE0_API = 'https://ce.judge0.com/submissions?base64_encoded=false&wait=true';
+const JUDGE0_PYTHON_ID = 71; // Python 3.8
 const PISTON_TIMEOUT_MS = 3000;
 const API_TIMEOUT_MS = 10000;
 const MAX_RETRIES = 2;
@@ -326,34 +327,42 @@ export async function runCode(
   const timeoutId = setTimeout(() => controller.abort(), PISTON_TIMEOUT_MS);
 
   try {
-    const response = await fetch(PISTON_API, {
+    const response = await fetch(JUDGE0_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        language: 'python',
-        version: '3.10.0',
-        files: [{ content: fullCode }],
+        source_code: fullCode,
+        language_id: JUDGE0_PYTHON_ID,
+        stdin: '',
       }),
     });
 
     if (!response.ok) {
-      throw new ApiError(`Piston API error: ${response.statusText}`, response.status);
+      throw new ApiError(`Judge0 API error: ${response.statusText}`, response.status);
     }
 
     const result = (await response.json()) as {
-      run: { stdout: string; stderr: string; code: number };
+      stdout: string | null;
+      stderr: string | null;
+      compile_output: string | null;
+      status: { id: number; description: string };
     };
 
-    const actualOutput = result.run.stdout.trim();
     const expected = expectedOutput.trim();
-    const stderr = result.run.stderr.trim();
+    const stdout = (result.stdout ?? '').trim();
+    const stderr = (result.stderr ?? result.compile_output ?? '').trim();
+
+    // status.id 5 = Time Limit Exceeded, 6 = Compilation Error, 7-12 = Runtime Error
+    if (result.status.id === 5) {
+      return { passed: false, input, expectedOutput: expected, actualOutput: '', error: 'Time limit exceeded (3s)' };
+    }
 
     return {
-      passed: actualOutput === expected && result.run.code === 0,
+      passed: stdout === expected && result.status.id === 3,
       input,
       expectedOutput: expected,
-      actualOutput,
+      actualOutput: stdout,
       ...(stderr ? { error: stderr } : {}),
     };
   } finally {
@@ -370,11 +379,32 @@ export async function submitCode(
   code: string,
   testCases: TestCase[],
 ): Promise<SubmissionResult> {
-  const testResults = await Promise.all(
-    testCases.map((tc) => runCode(code, tc.input, tc.expectedOutput)),
-  );
-  const passedCount = testResults.filter((r) => r.passed).length;
-  const allPassed = passedCount === testResults.length;
+  // Run at most 3 test cases concurrently to avoid overwhelming Piston
+  const CONCURRENCY = 3;
+  const testResults: TestResult[] = [];
+  for (let i = 0; i < testCases.length; i += CONCURRENCY) {
+    const batch = testCases.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map((tc) => runCode(code, tc.input, tc.expectedOutput)),
+    );
+    for (let j = 0; j < settled.length; j++) {
+      const outcome = settled[j];
+      if (outcome.status === 'fulfilled') {
+        testResults.push(outcome.value);
+      } else {
+        const tc = batch[j];
+        testResults.push({
+          passed: false,
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          actualOutput: '',
+          error: outcome.reason instanceof Error ? outcome.reason.message : 'Unknown error',
+        });
+      }
+    }
+  }
+
+  const allPassed = testResults.every((r) => r.passed);
 
   let status: SubmissionResult['status'];
   if (allPassed) {

@@ -121,6 +121,7 @@ export class ProblemWebviewProvider {
       script-src 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       font-src ${webview.cspSource} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       connect-src ${webview.cspSource} https://emkc.org https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+      worker-src blob:;
     "
   />
   <link rel="stylesheet" href="${cssUri}" />

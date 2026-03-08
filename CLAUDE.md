@@ -69,9 +69,14 @@ default-src 'none';
 style-src   ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
 script-src  'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
 font-src    ${webview.cspSource} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-connect-src ${webview.cspSource} https://emkc.org https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+connect-src ${webview.cspSource} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+worker-src  blob:;
 ```
-注意：Monaco 在运行时动态注入 `<link>` 加载自身 CSS（`editor.main.css`），因此 `style-src` 必须包含 `cdn.jsdelivr.net`。`connect-src` 需要 `${webview.cspSource}` 才能加载本地 source map（`main.js.map`）。
+注意：
+- Monaco 在运行时动态注入 `<link>` 加载自身 CSS（`editor.main.css`），因此 `style-src` 必须包含 `cdn.jsdelivr.net`。
+- `connect-src` 需要 `${webview.cspSource}` 才能加载本地 source map（`main.js.map`）。
+- `worker-src blob:` 是 Monaco language service web worker 必须的；缺少时 Monaco 降级到主线程并弹出警告。
+- 代码执行（`runCode` / `submitCode`）在 **Extension 进程**（Node.js）中运行，不受 WebView CSP 约束，因此 Judge0 域名无需加入 `connect-src`。
 
 ### Extension ↔ WebView 消息总线
 
@@ -93,11 +98,17 @@ connect-src ${webview.cspSource} https://emkc.org https://cdn.jsdelivr.net https
 - **`SubmissionResult`**：`{ status: SubmissionStatus, testResults: TestResult[], runtimeMs: number }`
 - **`AuthState`**：`{ isAuthenticated, token?, user? }`，`user` 为内联对象（无独立 `User` 类型）
 
-### MOCK_MODE
+### MOCK_MODE 与代码执行
 
 `src/services/api.ts` 顶部有 `export const MOCK_MODE = true`。阶段一全程使用本地 mock 数据（3道 COMP9021 题：`fibonacci` / `stack-implementation` / `bank-account`），每道题的 `testCases` 直接嵌入 `Problem` 对象，按 `slug` 查询。切换至 `false` 后会调用 `https://api.unsw-practice.com/api/v1`。
 
 所有后端调用走 `fetchWithRetry`（10 秒超时 + 2 次网络重试，4xx/5xx 不重试），网络/HTTP 错误统一抛 `ApiError`（含 `statusCode?`）。
+
+**代码执行引擎：Judge0 CE**（`https://ce.judge0.com`）
+
+> ⚠️ Piston 公共 API 自 2025-02-15 起改为白名单制，已不可用。
+
+`runCode(code, input, expectedOutput)` 将 `fullCode = code + "\n" + input` 发送给 Judge0 CE（`language_id: 71` = Python 3.8，`wait=true` 同步返回），对比 `stdout` 与 `expectedOutput`。`submitCode(code, testCases)` 用 `Promise.allSettled` 批量执行（每批最多 3 个并发），status `id === 3` 为 Accepted，`id === 5` 为 TLE。两者均在 **Extension 进程**运行，不经过 WebView。
 
 ### WebView 前端（src/webview/main.ts）
 

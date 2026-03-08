@@ -185,7 +185,8 @@ var vscode2 = __toESM(require("vscode"));
 // src/services/api.ts
 var MOCK_MODE = true;
 var API_BASE = "https://api.unsw-practice.com/api/v1";
-var PISTON_API = "https://emkc.org/api/v2/piston/execute";
+var JUDGE0_API = "https://ce.judge0.com/submissions?base64_encoded=false&wait=true";
+var JUDGE0_PYTHON_ID = 71;
 var PISTON_TIMEOUT_MS = 3e3;
 var API_TIMEOUT_MS = 1e4;
 var MAX_RETRIES = 2;
@@ -428,28 +429,31 @@ ${input}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), PISTON_TIMEOUT_MS);
   try {
-    const response = await fetch(PISTON_API, {
+    const response = await fetch(JUDGE0_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        language: "python",
-        version: "3.10.0",
-        files: [{ content: fullCode }]
+        source_code: fullCode,
+        language_id: JUDGE0_PYTHON_ID,
+        stdin: ""
       })
     });
     if (!response.ok) {
-      throw new ApiError(`Piston API error: ${response.statusText}`, response.status);
+      throw new ApiError(`Judge0 API error: ${response.statusText}`, response.status);
     }
     const result = await response.json();
-    const actualOutput = result.run.stdout.trim();
     const expected = expectedOutput.trim();
-    const stderr = result.run.stderr.trim();
+    const stdout = (result.stdout ?? "").trim();
+    const stderr = (result.stderr ?? result.compile_output ?? "").trim();
+    if (result.status.id === 5) {
+      return { passed: false, input, expectedOutput: expected, actualOutput: "", error: "Time limit exceeded (3s)" };
+    }
     return {
-      passed: actualOutput === expected && result.run.code === 0,
+      passed: stdout === expected && result.status.id === 3,
       input,
       expectedOutput: expected,
-      actualOutput,
+      actualOutput: stdout,
       ...stderr ? { error: stderr } : {}
     };
   } finally {
@@ -457,11 +461,30 @@ ${input}`;
   }
 }
 async function submitCode(code, testCases) {
-  const testResults = await Promise.all(
-    testCases.map((tc) => runCode(code, tc.input, tc.expectedOutput))
-  );
-  const passedCount = testResults.filter((r) => r.passed).length;
-  const allPassed = passedCount === testResults.length;
+  const CONCURRENCY = 3;
+  const testResults = [];
+  for (let i = 0; i < testCases.length; i += CONCURRENCY) {
+    const batch = testCases.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map((tc) => runCode(code, tc.input, tc.expectedOutput))
+    );
+    for (let j = 0; j < settled.length; j++) {
+      const outcome = settled[j];
+      if (outcome.status === "fulfilled") {
+        testResults.push(outcome.value);
+      } else {
+        const tc = batch[j];
+        testResults.push({
+          passed: false,
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          actualOutput: "",
+          error: outcome.reason instanceof Error ? outcome.reason.message : "Unknown error"
+        });
+      }
+    }
+  }
+  const allPassed = testResults.every((r) => r.passed);
   let status;
   if (allPassed) {
     status = "accepted" /* Accepted */;
@@ -578,6 +601,7 @@ var ProblemWebviewProvider = class {
       script-src 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       font-src ${webview.cspSource} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       connect-src ${webview.cspSource} https://emkc.org https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+      worker-src blob:;
     "
   />
   <link rel="stylesheet" href="${cssUri}" />
