@@ -15,10 +15,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 构建与开发命令
 
 ```bash
-npm run build          # 生产构建（两个 esbuild target）
-npm run watch          # 开发模式，文件变化自动重建
-npm run type-check     # 类型检查（零报错是硬性要求）
-npm run lint           # ESLint 检查
+npm run build              # 生产构建（两个 esbuild target）
+npm run watch              # 开发模式，文件变化自动重建
+npm run type-check         # 类型检查（零报错是硬性要求）
+npm run lint               # ESLint 检查
+npm run vscode:prepublish  # 打包前构建（production 模式）
 ```
 
 **调试：** F5 → 启动 Extension Development Host，左侧出现 UNSW Practice 图标。
@@ -28,14 +29,14 @@ npm run lint           # ESLint 检查
 ## 架构概览
 
 ```
-src/extension.ts          ← 入口：只做组装，零业务逻辑
+src/extension.ts          ← 入口：只做组装，零业务逻辑；含 loadProblems() 负责数据加载
 src/types/index.ts        ← 唯一数据契约（所有接口/枚举/常量定义在此）
 src/services/             ← 纯业务逻辑，零 VSCode UI 依赖
   api.ts                  ← fetchProblems / fetchProblem(slug) / submitSolution / fetchUserProgress / runCode / submitCode / ApiError
   auth.ts                 ← createAuthService(secrets) 工厂 + storeUser/getUser/clearUser
 src/providers/
-  ProblemTreeProvider.ts  ← 侧边栏题目列表（TreeDataProvider）
-  ProblemWebviewProvider.ts ← 做题面板（WebviewPanel + 消息总线）
+  ProblemTreeProvider.ts  ← 侧边栏题目列表（TreeDataProvider）；数据通过 setProblems() 推入，不自行 fetch
+  ProblemWebviewProvider.ts ← 做题面板（WebviewPanel + 消息总线）；单实例复用，openProblem() 切换题目
 src/commands/             ← 每个文件导出一个 register*() → vscode.Disposable
   openProblem.ts          ← unsw-practice.openProblem
   submitCode.ts           ← unsw-practice.submitCode
@@ -53,6 +54,14 @@ out/webview/main.js       ← 编译产物：IIFE browser bundle
 - **Webview**：`src/webview/main.ts` → `out/webview/main.js`（IIFE browser，无 external）
 
 TypeScript 配置（`tsconfig.json`）使用 `"module": "Preserve", "moduleResolution": "Bundler"`，专为 esbuild 设计，无需在 import 路径加 `.js` 后缀。
+
+### ProblemTreeProvider 数据流
+
+数据加载与 UI 解耦：`extension.ts` 的 `loadProblems()` 调用 `fetchProblems()` + `fetchUserProgress()`，完成后调用 `treeProvider.setProblems(problems, progress)`。Provider 内部维护三种状态（`loading` / `error` / `loaded`），分别渲染 spinner、错误提示或按难度分组的题目树（`GroupItem` → `ProblemTreeItem[]`）。`refresh` 命令触发 `loadProblems()` 重新拉取，而非仅 `fire()` 事件。
+
+### ProblemWebviewProvider 面板模式
+
+单 `WebviewPanel` 实例在多题目间复用：已存在时调 `reveal()`，不存在时创建。切换题目时直接覆写 `panel.webview.html` 并 postMessage `load-problem`。CSP 允许 `script-src cdn.jsdelivr.net`（Monaco）和 `connect-src emkc.org`（Piston）。Monaco 版本固定：`monaco-editor@0.52.0`（通过 CDN，不打包）。
 
 ### Extension ↔ WebView 消息总线
 
@@ -99,7 +108,7 @@ const monacoRequire = (globalThis as Record<string, unknown>)['require'] as Mona
 - **错误** 用 `vscode.window.showErrorMessage()` 展示，不 throw 到顶层
 - **`src/services/`** 的函数不得 `import * as vscode from 'vscode'`（可 `import type`），VSCode API 通过参数注入；`auth.ts` 用 `createAuthService(secrets)` 工厂注入一次，而非每次调用传参
 - **`src/commands/`** 每个文件导出一个 `register*()` 函数，返回 `vscode.Disposable`，在 `extension.ts` 统一注册
-- **`openProblem` 命令** 接收 `slug`（非 `id`）；`ProblemItem` 的 `command.arguments` 传 `problem.slug`
+- **`openProblem` 命令** 接收 `slug`（非 `id`）；`ProblemTreeItem` 的 `command.arguments` 传 `problem.slug`
 
 ---
 

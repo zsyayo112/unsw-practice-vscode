@@ -581,6 +581,7 @@ var ProblemWebviewProvider = class {
   <div id="app">
     <div class="loading-screen"><p>Loading problem\u2026</p></div>
   </div>
+  <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/marked@4/marked.min.js"></script>
   <script
     nonce="${nonce}"
     src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"
