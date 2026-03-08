@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { Problem } from '../types/index';
+import { Difficulty } from '../types/index';
 import { fetchProblems } from '../services/api';
 
 /** A single row in the Problems tree view. */
@@ -16,16 +17,16 @@ export class ProblemItem extends vscode.TreeItem {
       arguments: [problem.id],
     };
 
-    const iconMap: Record<Problem['difficulty'], vscode.ThemeIcon> = {
-      Easy: new vscode.ThemeIcon(
+    const iconMap: Record<Difficulty, vscode.ThemeIcon> = {
+      [Difficulty.Easy]: new vscode.ThemeIcon(
         'circle-filled',
         new vscode.ThemeColor('charts.green'),
       ),
-      Medium: new vscode.ThemeIcon(
+      [Difficulty.Medium]: new vscode.ThemeIcon(
         'circle-filled',
         new vscode.ThemeColor('charts.yellow'),
       ),
-      Hard: new vscode.ThemeIcon(
+      [Difficulty.Hard]: new vscode.ThemeIcon(
         'circle-filled',
         new vscode.ThemeColor('charts.red'),
       ),

@@ -61,7 +61,7 @@ export class ProblemWebviewProvider {
     if (message.type === 'run-code') {
       await this.postMessage({ type: 'loading', isLoading: true });
       try {
-        const result = await runCode(message.code, message.testCase);
+        const result = await runCode(message.code, message.input, message.expectedOutput);
         await this.postMessage({ type: 'run-result', result });
       } catch (error) {
         vscode.window.showErrorMessage(
@@ -73,7 +73,7 @@ export class ProblemWebviewProvider {
     } else if (message.type === 'submit-code') {
       await this.postMessage({ type: 'loading', isLoading: true });
       try {
-        const result = await submitCode(message.code, this.currentProblem.test_cases);
+        const result = await submitCode(message.code, this.currentProblem.testCases);
         await this.postMessage({ type: 'submit-result', result });
       } catch (error) {
         vscode.window.showErrorMessage(

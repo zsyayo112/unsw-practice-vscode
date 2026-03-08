@@ -105,6 +105,24 @@ Make every config file complete — zero TODOs, zero placeholders.
 ```
 
 ---
+## 当前任务：Week 2 — TypeScript 类型定义
+
+### 背景
+Week 1 脚手架已完成，项目骨架跑通，F5 可以启动插件。
+现在开始 Week 2，第一步是定义整个项目的数据契约。
+
+### 为什么先做类型定义
+这个文件是整个项目的地基：
+- 后续所有模块（api.ts、TreeProvider、WebviewProvider）都依赖这里的类型
+- 现在设计好，阶段二加用户体系、阶段三加社区功能时，只需要扩展不需要重写
+- TypeScript strict 模式下，类型错误会在编译期暴露，不会带到运行时
+
+### 完成标准
+- npx tsc --noEmit 零报错
+- 所有接口有 JSDoc 注释
+- 预留了 courseId 字段，支持未来多课程扩展
+
+---
 
 ## PROMPT 2 — TypeScript 类型定义
 

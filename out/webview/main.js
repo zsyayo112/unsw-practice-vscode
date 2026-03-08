@@ -20,7 +20,7 @@
   function renderDescription(problem) {
     const el = document.getElementById("description");
     if (!el) return;
-    const sampleCases = problem.test_cases.slice(0, 2);
+    const sampleCases = problem.testCases.slice(0, 2);
     el.innerHTML = `
     <h2>${escapeHtml(problem.title)}</h2>
     <span class="badge badge-${problem.difficulty.toLowerCase()}">${escapeHtml(problem.difficulty)}</span>
@@ -33,7 +33,7 @@
           <strong>Case ${String(i + 1)}</strong>
           <pre>${escapeHtml(tc.input)}</pre>
           <strong>Expected output:</strong>
-          <pre>${escapeHtml(tc.expected_output)}</pre>
+          <pre>${escapeHtml(tc.expectedOutput)}</pre>
         </div>
       `
     ).join("")}
@@ -94,11 +94,12 @@
     if (message.type === "load-problem") {
       currentProblem = message.problem;
       renderDescription(message.problem);
-      initMonaco(message.problem.starter_code);
+      initMonaco(message.problem.starterCode);
     } else if (message.type === "run-result") {
-      renderRunResult(message.result.passed, message.result.stdout, message.result.stderr);
+      renderRunResult(message.result.passed, message.result.actualOutput, message.result.error ?? "");
     } else if (message.type === "submit-result") {
-      renderSubmitResult(message.result.passed, message.result.total);
+      const passedCount = message.result.testResults.filter((r) => r.passed).length;
+      renderSubmitResult(passedCount, message.result.testResults.length);
     } else if (message.type === "loading") {
       setLoading(message.isLoading);
     }
@@ -127,8 +128,8 @@
   function setupButtons() {
     document.getElementById("btn-run")?.addEventListener("click", () => {
       if (!currentProblem) return;
-      const testCase = currentProblem.test_cases[0];
-      postMessage({ type: "run-code", code: getCode(), testCase });
+      const testCase = currentProblem.testCases[0];
+      postMessage({ type: "run-code", code: getCode(), input: testCase.input, expectedOutput: testCase.expectedOutput });
     });
     document.getElementById("btn-submit")?.addEventListener("click", () => {
       if (!currentProblem) return;

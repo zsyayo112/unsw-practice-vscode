@@ -6,7 +6,8 @@
  * Flip to false once the Next.js + Supabase backend is live.
  */
 
-import type { Problem, RunResult, SubmitResult, TestCase } from '../types/index';
+import type { Problem, TestCase, TestResult, SubmissionResult } from '../types/index';
+import { Difficulty, SubmissionStatus } from '../types/index';
 
 const MOCK_MODE = true;
 
@@ -19,9 +20,10 @@ const PISTON_TIMEOUT_MS = 3000;
 const MOCK_PROBLEMS: Problem[] = [
   {
     id: '001',
+    slug: 'list-comprehension-basics',
     title: 'List Comprehension Basics',
-    difficulty: 'Easy',
-    course_id: 'comp9021',
+    difficulty: Difficulty.Easy,
+    topics: ['list', 'comprehension'],
     description: [
       'Write a function `squares(n)` that returns a list of squares of numbers',
       'from 1 to n (inclusive).',
@@ -32,19 +34,23 @@ const MOCK_PROBLEMS: Problem[] = [
       'squares(0) → []',
       '```',
     ].join('\n'),
-    starter_code: 'def squares(n: int) -> list[int]:\n    # Your code here\n    pass\n',
-    test_cases: [
-      { input: 'print(squares(5))', expected_output: '[1, 4, 9, 16, 25]' },
-      { input: 'print(squares(1))', expected_output: '[1]' },
-      { input: 'print(squares(0))', expected_output: '[]' },
+    starterCode: 'def squares(n: int) -> list[int]:\n    # Your code here\n    pass\n',
+    hints: ['Try using a list comprehension with range().'],
+    acceptanceRate: 82,
+    orderIndex: 1,
+    isPublished: true,
+    testCases: [
+      { input: 'print(squares(5))', expectedOutput: '[1, 4, 9, 16, 25]' },
+      { input: 'print(squares(1))', expectedOutput: '[1]' },
+      { input: 'print(squares(0))', expectedOutput: '[]' },
     ],
-    tags: ['list', 'comprehension'],
   },
   {
     id: '002',
+    slug: 'dictionary-inversion',
     title: 'Dictionary Inversion',
-    difficulty: 'Easy',
-    course_id: 'comp9021',
+    difficulty: Difficulty.Easy,
+    topics: ['dictionary'],
     description: [
       'Write a function `invert_dict(d)` that returns a new dictionary with',
       'keys and values swapped.',
@@ -54,21 +60,25 @@ const MOCK_PROBLEMS: Problem[] = [
       "invert_dict({'a': 1, 'b': 2}) → {1: 'a', 2: 'b'}",
       '```',
     ].join('\n'),
-    starter_code: 'def invert_dict(d: dict) -> dict:\n    # Your code here\n    pass\n',
-    test_cases: [
+    starterCode: 'def invert_dict(d: dict) -> dict:\n    # Your code here\n    pass\n',
+    hints: ['Try a dict comprehension swapping k and v.'],
+    acceptanceRate: 78,
+    orderIndex: 2,
+    isPublished: true,
+    testCases: [
       {
         input: "print(invert_dict({'a': 1, 'b': 2}))",
-        expected_output: "{1: 'a', 2: 'b'}",
+        expectedOutput: "{1: 'a', 2: 'b'}",
       },
-      { input: 'print(invert_dict({}))', expected_output: '{}' },
+      { input: 'print(invert_dict({}))', expectedOutput: '{}' },
     ],
-    tags: ['dictionary'],
   },
   {
     id: '003',
+    slug: 'fibonacci-generator',
     title: 'Fibonacci Generator',
-    difficulty: 'Medium',
-    course_id: 'comp9021',
+    difficulty: Difficulty.Medium,
+    topics: ['generator', 'fibonacci'],
     description: [
       'Write a generator function `fib()` that yields Fibonacci numbers indefinitely.',
       '',
@@ -78,22 +88,26 @@ const MOCK_PROBLEMS: Problem[] = [
       '[next(gen) for _ in range(6)] → [0, 1, 1, 2, 3, 5]',
       '```',
     ].join('\n'),
-    starter_code:
+    starterCode:
       'from typing import Generator\n\ndef fib() -> Generator[int, None, None]:\n    # Your code here\n    pass\n',
-    test_cases: [
+    hints: ['Keep track of the previous two values using local variables.'],
+    acceptanceRate: 65,
+    orderIndex: 3,
+    isPublished: true,
+    testCases: [
       {
         input: 'gen = fib()\nprint([next(gen) for _ in range(6)])',
-        expected_output: '[0, 1, 1, 2, 3, 5]',
+        expectedOutput: '[0, 1, 1, 2, 3, 5]',
       },
-      { input: 'gen = fib()\nprint(next(gen))', expected_output: '0' },
+      { input: 'gen = fib()\nprint(next(gen))', expectedOutput: '0' },
     ],
-    tags: ['generator', 'fibonacci'],
   },
   {
     id: '004',
+    slug: 'flatten-nested-list',
     title: 'Flatten Nested List',
-    difficulty: 'Medium',
-    course_id: 'comp9021',
+    difficulty: Difficulty.Medium,
+    topics: ['recursion', 'list'],
     description: [
       'Write a function `flatten(lst)` that recursively flattens a nested list.',
       '',
@@ -102,22 +116,26 @@ const MOCK_PROBLEMS: Problem[] = [
       'flatten([1, [2, [3, 4]], 5]) → [1, 2, 3, 4, 5]',
       '```',
     ].join('\n'),
-    starter_code: 'def flatten(lst: list) -> list:\n    # Your code here\n    pass\n',
-    test_cases: [
+    starterCode: 'def flatten(lst: list) -> list:\n    # Your code here\n    pass\n',
+    hints: ['Use isinstance(x, list) to check if an element is a sublist.'],
+    acceptanceRate: 60,
+    orderIndex: 4,
+    isPublished: true,
+    testCases: [
       {
         input: 'print(flatten([1, [2, [3, 4]], 5]))',
-        expected_output: '[1, 2, 3, 4, 5]',
+        expectedOutput: '[1, 2, 3, 4, 5]',
       },
-      { input: 'print(flatten([]))', expected_output: '[]' },
-      { input: 'print(flatten([1, 2, 3]))', expected_output: '[1, 2, 3]' },
+      { input: 'print(flatten([]))', expectedOutput: '[]' },
+      { input: 'print(flatten([1, 2, 3]))', expectedOutput: '[1, 2, 3]' },
     ],
-    tags: ['recursion', 'list'],
   },
   {
     id: '005',
+    slug: 'binary-search',
     title: 'Binary Search',
-    difficulty: 'Hard',
-    course_id: 'comp9021',
+    difficulty: Difficulty.Hard,
+    topics: ['binary-search', 'algorithm'],
     description: [
       'Implement `binary_search(lst, target)` that returns the index of target',
       'in a sorted list, or -1 if not found. Do not use the `bisect` module.',
@@ -128,20 +146,23 @@ const MOCK_PROBLEMS: Problem[] = [
       'binary_search([1, 3, 5, 7, 9], 4) → -1',
       '```',
     ].join('\n'),
-    starter_code:
+    starterCode:
       'def binary_search(lst: list[int], target: int) -> int:\n    # Your code here\n    pass\n',
-    test_cases: [
+    hints: ['Maintain lo and hi pointers and compare the midpoint each iteration.'],
+    acceptanceRate: 48,
+    orderIndex: 5,
+    isPublished: true,
+    testCases: [
       {
         input: 'print(binary_search([1, 3, 5, 7, 9], 5))',
-        expected_output: '2',
+        expectedOutput: '2',
       },
       {
         input: 'print(binary_search([1, 3, 5, 7, 9], 4))',
-        expected_output: '-1',
+        expectedOutput: '-1',
       },
-      { input: 'print(binary_search([], 1))', expected_output: '-1' },
+      { input: 'print(binary_search([], 1))', expectedOutput: '-1' },
     ],
-    tags: ['binary-search', 'algorithm'],
   },
 ];
 
@@ -187,8 +208,12 @@ export async function fetchProblem(id: string): Promise<Problem> {
  * Run student code against a single test case via the Piston sandbox API.
  * Enforces a 3-second hard timeout.
  */
-export async function runCode(code: string, testCase: TestCase): Promise<RunResult> {
-  const fullCode = `${code}\n${testCase.input}`;
+export async function runCode(
+  code: string,
+  input: string,
+  expectedOutput: string,
+): Promise<TestResult> {
+  const fullCode = `${code}\n${input}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), PISTON_TIMEOUT_MS);
 
@@ -212,14 +237,16 @@ export async function runCode(code: string, testCase: TestCase): Promise<RunResu
       run: { stdout: string; stderr: string; code: number };
     };
 
-    const stdout = result.run.stdout.trim();
-    const expected = testCase.expected_output.trim();
+    const actualOutput = result.run.stdout.trim();
+    const expected = expectedOutput.trim();
+    const stderr = result.run.stderr.trim();
 
     return {
-      stdout,
-      stderr: result.run.stderr,
-      exit_code: result.run.code,
-      passed: stdout === expected,
+      passed: actualOutput === expected && result.run.code === 0,
+      input,
+      expectedOutput: expected,
+      actualOutput,
+      ...(stderr ? { error: stderr } : {}),
     };
   } finally {
     clearTimeout(timeoutId);
@@ -230,8 +257,24 @@ export async function runCode(code: string, testCase: TestCase): Promise<RunResu
  * Submit student code against all test cases of a problem.
  * Runs cases in parallel and aggregates the results.
  */
-export async function submitCode(code: string, testCases: TestCase[]): Promise<SubmitResult> {
-  const results = await Promise.all(testCases.map((tc) => runCode(code, tc)));
-  const passed = results.filter((r) => r.passed).length;
-  return { passed, total: results.length, results };
+export async function submitCode(
+  code: string,
+  testCases: TestCase[],
+): Promise<SubmissionResult> {
+  const testResults = await Promise.all(
+    testCases.map((tc) => runCode(code, tc.input, tc.expectedOutput)),
+  );
+  const passedCount = testResults.filter((r) => r.passed).length;
+  const allPassed = passedCount === testResults.length;
+
+  let status: SubmissionResult['status'];
+  if (allPassed) {
+    status = SubmissionStatus.Accepted;
+  } else if (testResults.some((r) => r.error)) {
+    status = SubmissionStatus.RuntimeError;
+  } else {
+    status = SubmissionStatus.WrongAnswer;
+  }
+
+  return { status, testResults, runtimeMs: 0 };
 }

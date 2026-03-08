@@ -8,7 +8,9 @@
  */
 
 import type * as vscode from 'vscode';
-import type { User } from '../types/index';
+import type { AuthState } from '../types/index';
+
+type User = NonNullable<AuthState['user']>;
 
 const TOKEN_KEY = 'unsw-practice.auth-token';
 const USER_KEY = 'unsw-practice.user';
