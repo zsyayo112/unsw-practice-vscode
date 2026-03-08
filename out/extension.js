@@ -184,7 +184,7 @@ var vscode2 = __toESM(require("vscode"));
 
 // src/services/api.ts
 var MOCK_MODE = false;
-var API_BASE = "http://172.23.83.101:3000/api/v1";
+var API_BASE = "https://unsw-practice-web.vercel.app/api/v1";
 var JUDGE0_API = "https://ce.judge0.com/submissions?base64_encoded=false&wait=true";
 var JUDGE0_PYTHON_ID = 71;
 var PISTON_TIMEOUT_MS = 3e3;

@@ -11,7 +11,7 @@ import { Difficulty, SubmissionStatus } from '../types/index';
 
 export const MOCK_MODE = false;
 
-const API_BASE = 'http://172.23.83.101:3000/api/v1';
+const API_BASE = 'https://unsw-practice-web.vercel.app/api/v1';
 const JUDGE0_API = 'https://ce.judge0.com/submissions?base64_encoded=false&wait=true';
 const JUDGE0_PYTHON_ID = 71; // Python 3.8
 const PISTON_TIMEOUT_MS = 3000;
