@@ -1,0 +1,96 @@
+{
+  "name": "unsw-practice",
+  "displayName": "UNSW Practice",
+  "description": "Practice COMP9021 Python problems inside VSCode — like LeetCode but in your editor.",
+  "version": "0.1.0",
+  "publisher": "unsw-practice",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": ["Education"],
+  "keywords": ["UNSW", "COMP9021", "Python", "practice", "coding"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "icon": "media/icon.png",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "unsw-practice",
+          "title": "UNSW Practice",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "unsw-practice": [
+        {
+          "id": "unsw-practice.problemList",
+          "name": "Problems",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "unsw-practice.openProblem",
+        "title": "Open Problem",
+        "category": "UNSW Practice"
+      },
+      {
+        "command": "unsw-practice.submitCode",
+        "title": "Submit Code",
+        "category": "UNSW Practice"
+      },
+      {
+        "command": "unsw-practice.login",
+        "title": "Login",
+        "category": "UNSW Practice"
+      },
+      {
+        "command": "unsw-practice.logout",
+        "title": "Logout",
+        "category": "UNSW Practice"
+      },
+      {
+        "command": "unsw-practice.refresh",
+        "title": "Refresh Problems",
+        "category": "UNSW Practice",
+        "icon": "$(refresh)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "unsw-practice.openProblem",
+        "key": "ctrl+shift+u",
+        "mac": "cmd+shift+u",
+        "when": "!editorFocus"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "unsw-practice.refresh",
+          "when": "view == unsw-practice.problemList",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "type-check": "tsc --noEmit",
+    "vscode:prepublish": "node esbuild.js --production"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.95.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.7.0"
+  }
+}
