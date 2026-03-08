@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { clearToken, clearUser } from '../services/auth';
+import type { AuthService } from '../services/auth';
+import { clearUser } from '../services/auth';
 
 /**
  * Register the `unsw-practice.login` and `unsw-practice.logout` commands.
@@ -7,7 +8,10 @@ import { clearToken, clearUser } from '../services/auth';
  * Phase 1: login shows an informational stub — no auth backend yet.
  * Phase 2: replace the login handler with a Supabase OAuth browser flow.
  */
-export function registerLogin(context: vscode.ExtensionContext): vscode.Disposable {
+export function registerLogin(
+  context: vscode.ExtensionContext,
+  authService: AuthService,
+): vscode.Disposable {
   const loginDisposable = vscode.commands.registerCommand(
     'unsw-practice.login',
     () => {
@@ -20,7 +24,7 @@ export function registerLogin(context: vscode.ExtensionContext): vscode.Disposab
   const logoutDisposable = vscode.commands.registerCommand(
     'unsw-practice.logout',
     async () => {
-      await clearToken(context.secrets);
+      await authService.clearToken();
       await clearUser(context.globalState);
       vscode.window.showInformationMessage('UNSW Practice: Logged out successfully.');
     },

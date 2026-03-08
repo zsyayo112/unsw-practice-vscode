@@ -13,9 +13,9 @@ export function registerOpenProblem(
 ): vscode.Disposable {
   return vscode.commands.registerCommand(
     'unsw-practice.openProblem',
-    async (problemId: string) => {
+    async (slug: string) => {
       try {
-        const problem = await fetchProblem(problemId);
+        const problem = await fetchProblem(slug);
         webviewProvider.openProblem(problem);
       } catch (error) {
         vscode.window.showErrorMessage(

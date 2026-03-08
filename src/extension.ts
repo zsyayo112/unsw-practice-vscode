@@ -4,6 +4,7 @@ import { ProblemWebviewProvider } from './providers/ProblemWebviewProvider';
 import { registerOpenProblem } from './commands/openProblem';
 import { registerSubmitCode } from './commands/submitCode';
 import { registerLogin } from './commands/login';
+import { createAuthService } from './services/auth';
 
 /**
  * Extension entry point.
@@ -11,6 +12,9 @@ import { registerLogin } from './commands/login';
  * All disposables are pushed to context.subscriptions for automatic cleanup.
  */
 export function activate(context: vscode.ExtensionContext): void {
+  // ── Services ───────────────────────────────────────────────────────────────
+  const authService = createAuthService(context.secrets);
+
   // ── Providers ─────────────────────────────────────────────────────────────
   const treeProvider = new ProblemTreeProvider();
   const webviewProvider = new ProblemWebviewProvider(context.extensionUri);
@@ -33,7 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
     refreshDisposable,
     registerOpenProblem(context, webviewProvider),
     registerSubmitCode(),
-    registerLogin(context),
+    registerLogin(context, authService),
   );
 }
 

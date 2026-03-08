@@ -1,7 +1,7 @@
 /**
  * Auth service — no VSCode UI dependencies.
- * VSCode APIs (SecretStorage, Memento) are injected as parameters
- * so this module can be tested and reused independently.
+ * VSCode SecretStorage is injected once via createAuthService() so this
+ * module can be tested and reused independently.
  *
  * Phase 1: token storage is wired up but login is a no-op stub.
  * Phase 2: implement OAuth flow against Supabase Auth.
@@ -9,37 +9,50 @@
 
 import type * as vscode from 'vscode';
 import type { AuthState } from '../types/index';
+import { SECRET_KEY } from '../types/index';
 
 type User = NonNullable<AuthState['user']>;
 
-const TOKEN_KEY = 'unsw-practice.auth-token';
 const USER_KEY = 'unsw-practice.user';
 
-/**
- * Persist an auth token in VSCode SecretStorage (encrypted on disk).
- */
-export async function storeToken(
-  secrets: vscode.SecretStorage,
-  token: string,
-): Promise<void> {
-  await secrets.store(TOKEN_KEY, token);
+// ── Auth service factory ──────────────────────────────────────────────────────
+
+export interface AuthService {
+  /** Retrieve the stored auth token. Returns undefined if not authenticated. */
+  getToken(): Promise<string | undefined>;
+  /** Persist an auth token in VSCode SecretStorage (encrypted on disk). */
+  setToken(token: string): Promise<void>;
+  /** Delete the stored auth token from SecretStorage. */
+  clearToken(): Promise<void>;
+  /** Returns true when a token is present. */
+  isAuthenticated(): Promise<boolean>;
 }
 
 /**
- * Retrieve the stored auth token.
- * Returns null if the user is not authenticated.
+ * Create an AuthService bound to the given SecretStorage instance.
+ * Call once in extension.ts activate() and share the result.
  */
-export async function getToken(secrets: vscode.SecretStorage): Promise<string | null> {
-  const token = await secrets.get(TOKEN_KEY);
-  return token ?? null;
+export function createAuthService(secrets: vscode.SecretStorage): AuthService {
+  return {
+    async getToken(): Promise<string | undefined> {
+      return secrets.get(SECRET_KEY);
+    },
+
+    async setToken(token: string): Promise<void> {
+      await secrets.store(SECRET_KEY, token);
+    },
+
+    async clearToken(): Promise<void> {
+      await secrets.delete(SECRET_KEY);
+    },
+
+    async isAuthenticated(): Promise<boolean> {
+      return (await secrets.get(SECRET_KEY)) !== undefined;
+    },
+  };
 }
 
-/**
- * Delete the stored auth token from SecretStorage.
- */
-export async function clearToken(secrets: vscode.SecretStorage): Promise<void> {
-  await secrets.delete(TOKEN_KEY);
-}
+// ── User helpers (global state) ───────────────────────────────────────────────
 
 /**
  * Persist basic user info in VSCode global state.

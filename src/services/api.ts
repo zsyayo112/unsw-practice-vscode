@@ -6,203 +6,311 @@
  * Flip to false once the Next.js + Supabase backend is live.
  */
 
-import type { Problem, TestCase, TestResult, SubmissionResult } from '../types/index';
+import type { Problem, TestCase, TestResult, SubmissionResult, UserProgress } from '../types/index';
 import { Difficulty, SubmissionStatus } from '../types/index';
 
-const MOCK_MODE = true;
+export const MOCK_MODE = true;
 
 const API_BASE = 'https://api.unsw-practice.com/api/v1';
 const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
 const PISTON_TIMEOUT_MS = 3000;
+const API_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 2;
 
-// ── Mock data ────────────────────────────────────────────────────────────────
+// ── ApiError ──────────────────────────────────────────────────────────────────
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly originalError?: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// ── Mock data ─────────────────────────────────────────────────────────────────
 
 const MOCK_PROBLEMS: Problem[] = [
   {
     id: '001',
-    slug: 'list-comprehension-basics',
-    title: 'List Comprehension Basics',
+    slug: 'fibonacci',
+    title: 'Fibonacci',
     difficulty: Difficulty.Easy,
-    topics: ['list', 'comprehension'],
+    topics: ['recursion'],
     description: [
-      'Write a function `squares(n)` that returns a list of squares of numbers',
-      'from 1 to n (inclusive).',
+      'Write a recursive function `fib(n)` that returns the n-th Fibonacci number.',
+      '',
+      'The sequence starts: 0, 1, 1, 2, 3, 5, 8, …',
       '',
       '**Example:**',
       '```',
-      'squares(5) → [1, 4, 9, 16, 25]',
-      'squares(0) → []',
+      'fib(0) → 0',
+      'fib(1) → 1',
+      'fib(10) → 55',
       '```',
     ].join('\n'),
-    starterCode: 'def squares(n: int) -> list[int]:\n    # Your code here\n    pass\n',
-    hints: ['Try using a list comprehension with range().'],
-    acceptanceRate: 82,
+    starterCode: 'def fib(n: int) -> int:\n    # Your code here\n    pass\n',
+    hints: [
+      'Base cases: fib(0) = 0, fib(1) = 1.',
+      'Recursive case: fib(n) = fib(n-1) + fib(n-2).',
+    ],
+    acceptanceRate: 75,
     orderIndex: 1,
     isPublished: true,
     testCases: [
-      { input: 'print(squares(5))', expectedOutput: '[1, 4, 9, 16, 25]' },
-      { input: 'print(squares(1))', expectedOutput: '[1]' },
-      { input: 'print(squares(0))', expectedOutput: '[]' },
+      { input: 'print(fib(0))', expectedOutput: '0' },
+      { input: 'print(fib(1))', expectedOutput: '1' },
+      { input: 'print(fib(10))', expectedOutput: '55' },
     ],
   },
   {
     id: '002',
-    slug: 'dictionary-inversion',
-    title: 'Dictionary Inversion',
-    difficulty: Difficulty.Easy,
-    topics: ['dictionary'],
+    slug: 'stack-implementation',
+    title: 'Stack Implementation',
+    difficulty: Difficulty.Medium,
+    topics: ['data-structures', 'list'],
     description: [
-      'Write a function `invert_dict(d)` that returns a new dictionary with',
-      'keys and values swapped.',
+      'Implement a `Stack` class backed by a Python list with the following methods:',
+      '',
+      '- `push(item)` — push an item onto the top of the stack',
+      '- `pop()` — remove and return the top item (raise `IndexError` if empty)',
+      '- `peek()` — return the top item without removing it (raise `IndexError` if empty)',
+      '- `is_empty()` — return `True` if the stack is empty',
+      '- `size()` — return the number of items',
       '',
       '**Example:**',
       '```',
-      "invert_dict({'a': 1, 'b': 2}) → {1: 'a', 2: 'b'}",
+      's = Stack()',
+      's.push(1)',
+      's.push(2)',
+      's.pop()   → 2',
+      's.peek()  → 1',
+      's.size()  → 1',
       '```',
     ].join('\n'),
-    starterCode: 'def invert_dict(d: dict) -> dict:\n    # Your code here\n    pass\n',
-    hints: ['Try a dict comprehension swapping k and v.'],
-    acceptanceRate: 78,
+    starterCode: [
+      'class Stack:',
+      '    def __init__(self) -> None:',
+      '        # Your code here',
+      '        pass',
+      '',
+      '    def push(self, item: object) -> None:',
+      '        pass',
+      '',
+      '    def pop(self) -> object:',
+      '        pass',
+      '',
+      '    def peek(self) -> object:',
+      '        pass',
+      '',
+      '    def is_empty(self) -> bool:',
+      '        pass',
+      '',
+      '    def size(self) -> int:',
+      '        pass',
+    ].join('\n') + '\n',
+    hints: [
+      'Store items in a list: self._data = [].',
+      'push → list.append(); pop and peek → list[-1] / list.pop().',
+    ],
+    acceptanceRate: 68,
     orderIndex: 2,
     isPublished: true,
     testCases: [
+      { input: 's = Stack()\ns.push(1)\ns.push(2)\nprint(s.pop())', expectedOutput: '2' },
+      { input: 's = Stack()\nprint(s.is_empty())', expectedOutput: 'True' },
       {
-        input: "print(invert_dict({'a': 1, 'b': 2}))",
-        expectedOutput: "{1: 'a', 2: 'b'}",
+        input: 's = Stack()\ns.push(1)\ns.push(2)\ns.push(3)\nprint(s.peek())',
+        expectedOutput: '3',
       },
-      { input: 'print(invert_dict({}))', expectedOutput: '{}' },
+      { input: 's = Stack()\ns.push(1)\ns.push(2)\nprint(s.size())', expectedOutput: '2' },
     ],
   },
   {
     id: '003',
-    slug: 'fibonacci-generator',
-    title: 'Fibonacci Generator',
+    slug: 'bank-account',
+    title: 'Bank Account',
     difficulty: Difficulty.Medium,
-    topics: ['generator', 'fibonacci'],
+    topics: ['oop', 'class'],
     description: [
-      'Write a generator function `fib()` that yields Fibonacci numbers indefinitely.',
+      'Implement a `BankAccount` class with:',
+      '',
+      '- `__init__(owner: str, balance: float = 0)` — create the account',
+      '- `deposit(amount: float)` — add funds',
+      '- `withdraw(amount: float) → bool` — deduct funds; return `False` if insufficient, `True` otherwise',
+      '- `get_balance() → float` — return the current balance',
       '',
       '**Example:**',
       '```',
-      'gen = fib()',
-      '[next(gen) for _ in range(6)] → [0, 1, 1, 2, 3, 5]',
+      'acc = BankAccount("Alice", 100)',
+      'acc.deposit(50)       → balance 150',
+      'acc.withdraw(30)      → True, balance 120',
+      'acc.withdraw(200)     → False, balance unchanged',
       '```',
     ].join('\n'),
-    starterCode:
-      'from typing import Generator\n\ndef fib() -> Generator[int, None, None]:\n    # Your code here\n    pass\n',
-    hints: ['Keep track of the previous two values using local variables.'],
-    acceptanceRate: 65,
+    starterCode: [
+      'class BankAccount:',
+      '    def __init__(self, owner: str, balance: float = 0) -> None:',
+      '        # Your code here',
+      '        pass',
+      '',
+      '    def deposit(self, amount: float) -> None:',
+      '        pass',
+      '',
+      '    def withdraw(self, amount: float) -> bool:',
+      '        pass',
+      '',
+      '    def get_balance(self) -> float:',
+      '        pass',
+    ].join('\n') + '\n',
+    hints: [
+      'Store owner and balance as instance attributes in __init__.',
+      'withdraw should check balance >= amount before deducting.',
+    ],
+    acceptanceRate: 71,
     orderIndex: 3,
     isPublished: true,
     testCases: [
       {
-        input: 'gen = fib()\nprint([next(gen) for _ in range(6)])',
-        expectedOutput: '[0, 1, 1, 2, 3, 5]',
-      },
-      { input: 'gen = fib()\nprint(next(gen))', expectedOutput: '0' },
-    ],
-  },
-  {
-    id: '004',
-    slug: 'flatten-nested-list',
-    title: 'Flatten Nested List',
-    difficulty: Difficulty.Medium,
-    topics: ['recursion', 'list'],
-    description: [
-      'Write a function `flatten(lst)` that recursively flattens a nested list.',
-      '',
-      '**Example:**',
-      '```',
-      'flatten([1, [2, [3, 4]], 5]) → [1, 2, 3, 4, 5]',
-      '```',
-    ].join('\n'),
-    starterCode: 'def flatten(lst: list) -> list:\n    # Your code here\n    pass\n',
-    hints: ['Use isinstance(x, list) to check if an element is a sublist.'],
-    acceptanceRate: 60,
-    orderIndex: 4,
-    isPublished: true,
-    testCases: [
-      {
-        input: 'print(flatten([1, [2, [3, 4]], 5]))',
-        expectedOutput: '[1, 2, 3, 4, 5]',
-      },
-      { input: 'print(flatten([]))', expectedOutput: '[]' },
-      { input: 'print(flatten([1, 2, 3]))', expectedOutput: '[1, 2, 3]' },
-    ],
-  },
-  {
-    id: '005',
-    slug: 'binary-search',
-    title: 'Binary Search',
-    difficulty: Difficulty.Hard,
-    topics: ['binary-search', 'algorithm'],
-    description: [
-      'Implement `binary_search(lst, target)` that returns the index of target',
-      'in a sorted list, or -1 if not found. Do not use the `bisect` module.',
-      '',
-      '**Example:**',
-      '```',
-      'binary_search([1, 3, 5, 7, 9], 5) → 2',
-      'binary_search([1, 3, 5, 7, 9], 4) → -1',
-      '```',
-    ].join('\n'),
-    starterCode:
-      'def binary_search(lst: list[int], target: int) -> int:\n    # Your code here\n    pass\n',
-    hints: ['Maintain lo and hi pointers and compare the midpoint each iteration.'],
-    acceptanceRate: 48,
-    orderIndex: 5,
-    isPublished: true,
-    testCases: [
-      {
-        input: 'print(binary_search([1, 3, 5, 7, 9], 5))',
-        expectedOutput: '2',
+        input: 'acc = BankAccount("Alice", 100)\nprint(acc.get_balance())',
+        expectedOutput: '100',
       },
       {
-        input: 'print(binary_search([1, 3, 5, 7, 9], 4))',
-        expectedOutput: '-1',
+        input: 'acc = BankAccount("Bob")\nacc.deposit(50)\nprint(acc.get_balance())',
+        expectedOutput: '50',
       },
-      { input: 'print(binary_search([], 1))', expectedOutput: '-1' },
+      {
+        input: 'acc = BankAccount("Charlie", 100)\nprint(acc.withdraw(30))',
+        expectedOutput: 'True',
+      },
+      {
+        input: 'acc = BankAccount("Dave", 100)\nacc.withdraw(30)\nprint(acc.get_balance())',
+        expectedOutput: '70',
+      },
+      {
+        input: 'acc = BankAccount("Eve", 50)\nprint(acc.withdraw(100))',
+        expectedOutput: 'False',
+      },
     ],
   },
 ];
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retriesLeft: number = MAX_RETRIES,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) {
+      // 4xx / 5xx — surface immediately, no retry
+      throw new ApiError(
+        `HTTP ${response.status}: ${response.statusText}`,
+        response.status,
+      );
+    }
+    return response;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    if (retriesLeft > 0) {
+      return fetchWithRetry(url, options, retriesLeft - 1);
+    }
+    throw new ApiError('Network error after max retries', undefined, err);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function authHeaders(token?: string): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Fetch the full problem list.
- * In MOCK_MODE returns local fixtures; otherwise calls /api/v1/problems.
+ * In MOCK_MODE returns local fixtures; otherwise calls GET /api/v1/problems.
  */
-export async function fetchProblems(): Promise<Problem[]> {
+export async function fetchProblems(token?: string): Promise<Problem[]> {
   if (MOCK_MODE) {
     return Promise.resolve(MOCK_PROBLEMS);
   }
-  const response = await fetch(`${API_BASE}/problems`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch problems: ${response.statusText}`);
-  }
+  const response = await fetchWithRetry(`${API_BASE}/problems`, {
+    headers: authHeaders(token),
+  });
   const json = (await response.json()) as { data: Problem[] };
   return json.data;
 }
 
 /**
- * Fetch a single problem by ID.
- * In MOCK_MODE returns local fixture; otherwise calls /api/v1/problems/:id.
+ * Fetch a single problem by slug.
+ * In MOCK_MODE returns local fixture; otherwise calls GET /api/v1/problems/:slug.
  */
-export async function fetchProblem(id: string): Promise<Problem> {
+export async function fetchProblem(slug: string, token?: string): Promise<Problem> {
   if (MOCK_MODE) {
-    const problem = MOCK_PROBLEMS.find((p) => p.id === id);
+    const problem = MOCK_PROBLEMS.find((p) => p.slug === slug);
     if (!problem) {
-      throw new Error(`Problem "${id}" not found`);
+      throw new ApiError(`Problem "${slug}" not found`);
     }
     return Promise.resolve(problem);
   }
-  const response = await fetch(`${API_BASE}/problems/${id}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch problem ${id}: ${response.statusText}`);
-  }
+  const response = await fetchWithRetry(`${API_BASE}/problems/${slug}`, {
+    headers: authHeaders(token),
+  });
   const json = (await response.json()) as { data: Problem };
   return json.data;
 }
+
+/**
+ * Submit student code for a problem.
+ * In MOCK_MODE runs against the Piston sandbox; otherwise calls POST /api/v1/submit.
+ */
+export async function submitSolution(params: {
+  problemId: string;
+  code: string;
+  token: string;
+}): Promise<SubmissionResult> {
+  if (MOCK_MODE) {
+    const problem = MOCK_PROBLEMS.find((p) => p.id === params.problemId);
+    if (!problem) {
+      throw new ApiError(`Problem "${params.problemId}" not found`);
+    }
+    return submitCode(params.code, problem.testCases);
+  }
+  const response = await fetchWithRetry(`${API_BASE}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(params.token) },
+    body: JSON.stringify({ problemId: params.problemId, code: params.code }),
+  });
+  const json = (await response.json()) as { data: SubmissionResult };
+  return json.data;
+}
+
+/**
+ * Fetch per-problem progress for the authenticated user.
+ * In MOCK_MODE returns an empty array (no local progress tracking in Phase 1).
+ * Otherwise calls GET /api/v1/progress.
+ */
+export async function fetchUserProgress(token: string): Promise<UserProgress[]> {
+  if (MOCK_MODE) {
+    return Promise.resolve([]);
+  }
+  const response = await fetchWithRetry(`${API_BASE}/progress`, {
+    headers: authHeaders(token),
+  });
+  const json = (await response.json()) as { data: UserProgress[] };
+  return json.data;
+}
+
+// ── Piston (local code execution) ─────────────────────────────────────────────
 
 /**
  * Run student code against a single test case via the Piston sandbox API.
@@ -230,7 +338,7 @@ export async function runCode(
     });
 
     if (!response.ok) {
-      throw new Error(`Piston API error: ${response.statusText}`);
+      throw new ApiError(`Piston API error: ${response.statusText}`, response.status);
     }
 
     const result = (await response.json()) as {
@@ -254,7 +362,8 @@ export async function runCode(
 }
 
 /**
- * Submit student code against all test cases of a problem.
+ * Run student code against all test cases of a problem.
+ * Used by the WebView "Submit" flow in MOCK_MODE (no auth token required).
  * Runs cases in parallel and aggregates the results.
  */
 export async function submitCode(

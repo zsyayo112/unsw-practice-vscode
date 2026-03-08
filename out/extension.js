@@ -39,180 +39,236 @@ var vscode6 = __toESM(require("vscode"));
 // src/providers/ProblemTreeProvider.ts
 var vscode = __toESM(require("vscode"));
 
+// src/types/index.ts
+var SECRET_KEY = "unsw-practice.authToken";
+
 // src/services/api.ts
 var MOCK_MODE = true;
 var API_BASE = "https://api.unsw-practice.com/api/v1";
 var PISTON_API = "https://emkc.org/api/v2/piston/execute";
 var PISTON_TIMEOUT_MS = 3e3;
+var API_TIMEOUT_MS = 1e4;
+var MAX_RETRIES = 2;
+var ApiError = class extends Error {
+  constructor(message, statusCode, originalError) {
+    super(message);
+    this.statusCode = statusCode;
+    this.originalError = originalError;
+    this.name = "ApiError";
+  }
+};
 var MOCK_PROBLEMS = [
   {
     id: "001",
-    slug: "list-comprehension-basics",
-    title: "List Comprehension Basics",
+    slug: "fibonacci",
+    title: "Fibonacci",
     difficulty: "easy" /* Easy */,
-    topics: ["list", "comprehension"],
+    topics: ["recursion"],
     description: [
-      "Write a function `squares(n)` that returns a list of squares of numbers",
-      "from 1 to n (inclusive).",
+      "Write a recursive function `fib(n)` that returns the n-th Fibonacci number.",
+      "",
+      "The sequence starts: 0, 1, 1, 2, 3, 5, 8, \u2026",
       "",
       "**Example:**",
       "```",
-      "squares(5) \u2192 [1, 4, 9, 16, 25]",
-      "squares(0) \u2192 []",
+      "fib(0) \u2192 0",
+      "fib(1) \u2192 1",
+      "fib(10) \u2192 55",
       "```"
     ].join("\n"),
-    starterCode: "def squares(n: int) -> list[int]:\n    # Your code here\n    pass\n",
-    hints: ["Try using a list comprehension with range()."],
-    acceptanceRate: 82,
+    starterCode: "def fib(n: int) -> int:\n    # Your code here\n    pass\n",
+    hints: [
+      "Base cases: fib(0) = 0, fib(1) = 1.",
+      "Recursive case: fib(n) = fib(n-1) + fib(n-2)."
+    ],
+    acceptanceRate: 75,
     orderIndex: 1,
     isPublished: true,
     testCases: [
-      { input: "print(squares(5))", expectedOutput: "[1, 4, 9, 16, 25]" },
-      { input: "print(squares(1))", expectedOutput: "[1]" },
-      { input: "print(squares(0))", expectedOutput: "[]" }
+      { input: "print(fib(0))", expectedOutput: "0" },
+      { input: "print(fib(1))", expectedOutput: "1" },
+      { input: "print(fib(10))", expectedOutput: "55" }
     ]
   },
   {
     id: "002",
-    slug: "dictionary-inversion",
-    title: "Dictionary Inversion",
-    difficulty: "easy" /* Easy */,
-    topics: ["dictionary"],
+    slug: "stack-implementation",
+    title: "Stack Implementation",
+    difficulty: "medium" /* Medium */,
+    topics: ["data-structures", "list"],
     description: [
-      "Write a function `invert_dict(d)` that returns a new dictionary with",
-      "keys and values swapped.",
+      "Implement a `Stack` class backed by a Python list with the following methods:",
+      "",
+      "- `push(item)` \u2014 push an item onto the top of the stack",
+      "- `pop()` \u2014 remove and return the top item (raise `IndexError` if empty)",
+      "- `peek()` \u2014 return the top item without removing it (raise `IndexError` if empty)",
+      "- `is_empty()` \u2014 return `True` if the stack is empty",
+      "- `size()` \u2014 return the number of items",
       "",
       "**Example:**",
       "```",
-      "invert_dict({'a': 1, 'b': 2}) \u2192 {1: 'a', 2: 'b'}",
+      "s = Stack()",
+      "s.push(1)",
+      "s.push(2)",
+      "s.pop()   \u2192 2",
+      "s.peek()  \u2192 1",
+      "s.size()  \u2192 1",
       "```"
     ].join("\n"),
-    starterCode: "def invert_dict(d: dict) -> dict:\n    # Your code here\n    pass\n",
-    hints: ["Try a dict comprehension swapping k and v."],
-    acceptanceRate: 78,
+    starterCode: [
+      "class Stack:",
+      "    def __init__(self) -> None:",
+      "        # Your code here",
+      "        pass",
+      "",
+      "    def push(self, item: object) -> None:",
+      "        pass",
+      "",
+      "    def pop(self) -> object:",
+      "        pass",
+      "",
+      "    def peek(self) -> object:",
+      "        pass",
+      "",
+      "    def is_empty(self) -> bool:",
+      "        pass",
+      "",
+      "    def size(self) -> int:",
+      "        pass"
+    ].join("\n") + "\n",
+    hints: [
+      "Store items in a list: self._data = [].",
+      "push \u2192 list.append(); pop and peek \u2192 list[-1] / list.pop()."
+    ],
+    acceptanceRate: 68,
     orderIndex: 2,
     isPublished: true,
     testCases: [
+      { input: "s = Stack()\ns.push(1)\ns.push(2)\nprint(s.pop())", expectedOutput: "2" },
+      { input: "s = Stack()\nprint(s.is_empty())", expectedOutput: "True" },
       {
-        input: "print(invert_dict({'a': 1, 'b': 2}))",
-        expectedOutput: "{1: 'a', 2: 'b'}"
+        input: "s = Stack()\ns.push(1)\ns.push(2)\ns.push(3)\nprint(s.peek())",
+        expectedOutput: "3"
       },
-      { input: "print(invert_dict({}))", expectedOutput: "{}" }
+      { input: "s = Stack()\ns.push(1)\ns.push(2)\nprint(s.size())", expectedOutput: "2" }
     ]
   },
   {
     id: "003",
-    slug: "fibonacci-generator",
-    title: "Fibonacci Generator",
+    slug: "bank-account",
+    title: "Bank Account",
     difficulty: "medium" /* Medium */,
-    topics: ["generator", "fibonacci"],
+    topics: ["oop", "class"],
     description: [
-      "Write a generator function `fib()` that yields Fibonacci numbers indefinitely.",
+      "Implement a `BankAccount` class with:",
+      "",
+      "- `__init__(owner: str, balance: float = 0)` \u2014 create the account",
+      "- `deposit(amount: float)` \u2014 add funds",
+      "- `withdraw(amount: float) \u2192 bool` \u2014 deduct funds; return `False` if insufficient, `True` otherwise",
+      "- `get_balance() \u2192 float` \u2014 return the current balance",
       "",
       "**Example:**",
       "```",
-      "gen = fib()",
-      "[next(gen) for _ in range(6)] \u2192 [0, 1, 1, 2, 3, 5]",
+      'acc = BankAccount("Alice", 100)',
+      "acc.deposit(50)       \u2192 balance 150",
+      "acc.withdraw(30)      \u2192 True, balance 120",
+      "acc.withdraw(200)     \u2192 False, balance unchanged",
       "```"
     ].join("\n"),
-    starterCode: "from typing import Generator\n\ndef fib() -> Generator[int, None, None]:\n    # Your code here\n    pass\n",
-    hints: ["Keep track of the previous two values using local variables."],
-    acceptanceRate: 65,
+    starterCode: [
+      "class BankAccount:",
+      "    def __init__(self, owner: str, balance: float = 0) -> None:",
+      "        # Your code here",
+      "        pass",
+      "",
+      "    def deposit(self, amount: float) -> None:",
+      "        pass",
+      "",
+      "    def withdraw(self, amount: float) -> bool:",
+      "        pass",
+      "",
+      "    def get_balance(self) -> float:",
+      "        pass"
+    ].join("\n") + "\n",
+    hints: [
+      "Store owner and balance as instance attributes in __init__.",
+      "withdraw should check balance >= amount before deducting."
+    ],
+    acceptanceRate: 71,
     orderIndex: 3,
     isPublished: true,
     testCases: [
       {
-        input: "gen = fib()\nprint([next(gen) for _ in range(6)])",
-        expectedOutput: "[0, 1, 1, 2, 3, 5]"
-      },
-      { input: "gen = fib()\nprint(next(gen))", expectedOutput: "0" }
-    ]
-  },
-  {
-    id: "004",
-    slug: "flatten-nested-list",
-    title: "Flatten Nested List",
-    difficulty: "medium" /* Medium */,
-    topics: ["recursion", "list"],
-    description: [
-      "Write a function `flatten(lst)` that recursively flattens a nested list.",
-      "",
-      "**Example:**",
-      "```",
-      "flatten([1, [2, [3, 4]], 5]) \u2192 [1, 2, 3, 4, 5]",
-      "```"
-    ].join("\n"),
-    starterCode: "def flatten(lst: list) -> list:\n    # Your code here\n    pass\n",
-    hints: ["Use isinstance(x, list) to check if an element is a sublist."],
-    acceptanceRate: 60,
-    orderIndex: 4,
-    isPublished: true,
-    testCases: [
-      {
-        input: "print(flatten([1, [2, [3, 4]], 5]))",
-        expectedOutput: "[1, 2, 3, 4, 5]"
-      },
-      { input: "print(flatten([]))", expectedOutput: "[]" },
-      { input: "print(flatten([1, 2, 3]))", expectedOutput: "[1, 2, 3]" }
-    ]
-  },
-  {
-    id: "005",
-    slug: "binary-search",
-    title: "Binary Search",
-    difficulty: "hard" /* Hard */,
-    topics: ["binary-search", "algorithm"],
-    description: [
-      "Implement `binary_search(lst, target)` that returns the index of target",
-      "in a sorted list, or -1 if not found. Do not use the `bisect` module.",
-      "",
-      "**Example:**",
-      "```",
-      "binary_search([1, 3, 5, 7, 9], 5) \u2192 2",
-      "binary_search([1, 3, 5, 7, 9], 4) \u2192 -1",
-      "```"
-    ].join("\n"),
-    starterCode: "def binary_search(lst: list[int], target: int) -> int:\n    # Your code here\n    pass\n",
-    hints: ["Maintain lo and hi pointers and compare the midpoint each iteration."],
-    acceptanceRate: 48,
-    orderIndex: 5,
-    isPublished: true,
-    testCases: [
-      {
-        input: "print(binary_search([1, 3, 5, 7, 9], 5))",
-        expectedOutput: "2"
+        input: 'acc = BankAccount("Alice", 100)\nprint(acc.get_balance())',
+        expectedOutput: "100"
       },
       {
-        input: "print(binary_search([1, 3, 5, 7, 9], 4))",
-        expectedOutput: "-1"
+        input: 'acc = BankAccount("Bob")\nacc.deposit(50)\nprint(acc.get_balance())',
+        expectedOutput: "50"
       },
-      { input: "print(binary_search([], 1))", expectedOutput: "-1" }
+      {
+        input: 'acc = BankAccount("Charlie", 100)\nprint(acc.withdraw(30))',
+        expectedOutput: "True"
+      },
+      {
+        input: 'acc = BankAccount("Dave", 100)\nacc.withdraw(30)\nprint(acc.get_balance())',
+        expectedOutput: "70"
+      },
+      {
+        input: 'acc = BankAccount("Eve", 50)\nprint(acc.withdraw(100))',
+        expectedOutput: "False"
+      }
     ]
   }
 ];
-async function fetchProblems() {
+async function fetchWithRetry(url, options, retriesLeft = MAX_RETRIES) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) {
+      throw new ApiError(
+        `HTTP ${response.status}: ${response.statusText}`,
+        response.status
+      );
+    }
+    return response;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    if (retriesLeft > 0) {
+      return fetchWithRetry(url, options, retriesLeft - 1);
+    }
+    throw new ApiError("Network error after max retries", void 0, err);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+function authHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+async function fetchProblems(token) {
   if (MOCK_MODE) {
     return Promise.resolve(MOCK_PROBLEMS);
   }
-  const response = await fetch(`${API_BASE}/problems`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch problems: ${response.statusText}`);
-  }
+  const response = await fetchWithRetry(`${API_BASE}/problems`, {
+    headers: authHeaders(token)
+  });
   const json = await response.json();
   return json.data;
 }
-async function fetchProblem(id) {
+async function fetchProblem(slug, token) {
   if (MOCK_MODE) {
-    const problem = MOCK_PROBLEMS.find((p) => p.id === id);
+    const problem = MOCK_PROBLEMS.find((p) => p.slug === slug);
     if (!problem) {
-      throw new Error(`Problem "${id}" not found`);
+      throw new ApiError(`Problem "${slug}" not found`);
     }
     return Promise.resolve(problem);
   }
-  const response = await fetch(`${API_BASE}/problems/${id}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch problem ${id}: ${response.statusText}`);
-  }
+  const response = await fetchWithRetry(`${API_BASE}/problems/${slug}`, {
+    headers: authHeaders(token)
+  });
   const json = await response.json();
   return json.data;
 }
@@ -233,7 +289,7 @@ ${input}`;
       })
     });
     if (!response.ok) {
-      throw new Error(`Piston API error: ${response.statusText}`);
+      throw new ApiError(`Piston API error: ${response.statusText}`, response.status);
     }
     const result = await response.json();
     const actualOutput = result.run.stdout.trim();
@@ -278,7 +334,7 @@ var ProblemItem = class extends vscode.TreeItem {
     this.command = {
       command: "unsw-practice.openProblem",
       title: "Open Problem",
-      arguments: [problem.id]
+      arguments: [problem.slug]
     };
     const iconMap = {
       ["easy" /* Easy */]: new vscode.ThemeIcon(
@@ -465,9 +521,9 @@ var vscode3 = __toESM(require("vscode"));
 function registerOpenProblem(_context, webviewProvider) {
   return vscode3.commands.registerCommand(
     "unsw-practice.openProblem",
-    async (problemId) => {
+    async (slug) => {
       try {
-        const problem = await fetchProblem(problemId);
+        const problem = await fetchProblem(slug);
         webviewProvider.openProblem(problem);
       } catch (error) {
         vscode3.window.showErrorMessage(
@@ -492,17 +548,29 @@ function registerSubmitCode() {
 var vscode5 = __toESM(require("vscode"));
 
 // src/services/auth.ts
-var TOKEN_KEY = "unsw-practice.auth-token";
 var USER_KEY = "unsw-practice.user";
-async function clearToken(secrets) {
-  await secrets.delete(TOKEN_KEY);
+function createAuthService(secrets) {
+  return {
+    async getToken() {
+      return secrets.get(SECRET_KEY);
+    },
+    async setToken(token) {
+      await secrets.store(SECRET_KEY, token);
+    },
+    async clearToken() {
+      await secrets.delete(SECRET_KEY);
+    },
+    async isAuthenticated() {
+      return await secrets.get(SECRET_KEY) !== void 0;
+    }
+  };
 }
 async function clearUser(globalState) {
   await globalState.update(USER_KEY, void 0);
 }
 
 // src/commands/login.ts
-function registerLogin(context) {
+function registerLogin(context, authService) {
   const loginDisposable = vscode5.commands.registerCommand(
     "unsw-practice.login",
     () => {
@@ -514,7 +582,7 @@ function registerLogin(context) {
   const logoutDisposable = vscode5.commands.registerCommand(
     "unsw-practice.logout",
     async () => {
-      await clearToken(context.secrets);
+      await authService.clearToken();
       await clearUser(context.globalState);
       vscode5.window.showInformationMessage("UNSW Practice: Logged out successfully.");
     }
@@ -524,6 +592,7 @@ function registerLogin(context) {
 
 // src/extension.ts
 function activate(context) {
+  const authService = createAuthService(context.secrets);
   const treeProvider = new ProblemTreeProvider();
   const webviewProvider = new ProblemWebviewProvider(context.extensionUri);
   const treeView = vscode6.window.createTreeView("unsw-practice.problemList", {
@@ -539,7 +608,7 @@ function activate(context) {
     refreshDisposable,
     registerOpenProblem(context, webviewProvider),
     registerSubmitCode(),
-    registerLogin(context)
+    registerLogin(context, authService)
   );
 }
 function deactivate() {

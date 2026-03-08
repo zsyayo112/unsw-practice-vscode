@@ -14,7 +14,7 @@ export class ProblemItem extends vscode.TreeItem {
     this.command = {
       command: 'unsw-practice.openProblem',
       title: 'Open Problem',
-      arguments: [problem.id],
+      arguments: [problem.slug],
     };
 
     const iconMap: Record<Difficulty, vscode.ThemeIcon> = {
