@@ -42,6 +42,140 @@ var vscode = __toESM(require("vscode"));
 // src/types/index.ts
 var SECRET_KEY = "unsw-practice.authToken";
 
+// src/providers/ProblemTreeProvider.ts
+var DIFFICULTY_PREFIX = {
+  ["easy" /* Easy */]: "[E]",
+  ["medium" /* Medium */]: "[M]",
+  ["hard" /* Hard */]: "[H]"
+};
+var DIFFICULTY_LABEL = {
+  ["easy" /* Easy */]: "\u{1F7E2} Easy",
+  ["medium" /* Medium */]: "\u{1F7E1} Medium",
+  ["hard" /* Hard */]: "\u{1F534} Hard"
+};
+var ProblemTreeItem = class extends vscode.TreeItem {
+  constructor(problem, status) {
+    super(
+      `${DIFFICULTY_PREFIX[problem.difficulty]} #${problem.orderIndex}  ${problem.title}`,
+      vscode.TreeItemCollapsibleState.None
+    );
+    this.problem = problem;
+    this.status = status;
+    this.description = problem.topics.join(" \xB7 ");
+    this.tooltip = problem.description.slice(0, 120);
+    this.contextValue = "problem";
+    this.command = {
+      command: "unsw-practice.openProblem",
+      title: "Open Problem",
+      arguments: [problem.slug]
+    };
+    const iconMap = {
+      solved: new vscode.ThemeIcon("pass-filled", new vscode.ThemeColor("testing.iconPassed")),
+      attempted: new vscode.ThemeIcon(
+        "circle-large-outline",
+        new vscode.ThemeColor("charts.yellow")
+      ),
+      unsolved: new vscode.ThemeIcon("circle-outline")
+    };
+    this.iconPath = iconMap[status];
+  }
+  status;
+};
+var GroupItem = class extends vscode.TreeItem {
+  children;
+  constructor(difficulty, children) {
+    const solvedCount = children.filter((c) => c.status === "solved").length;
+    super(
+      `${DIFFICULTY_LABEL[difficulty]} (${solvedCount} solved / ${children.length} total)`,
+      vscode.TreeItemCollapsibleState.Expanded
+    );
+    this.children = children;
+    this.contextValue = "group";
+  }
+};
+var StatusItem = class extends vscode.TreeItem {
+  constructor(kind) {
+    if (kind === "loading") {
+      super("Loading problems...", vscode.TreeItemCollapsibleState.None);
+      this.iconPath = new vscode.ThemeIcon("loading~spin");
+    } else {
+      super("\u26A0 Failed to load \u2014 click Refresh", vscode.TreeItemCollapsibleState.None);
+    }
+  }
+};
+var ProblemTreeProvider = class {
+  _onDidChangeTreeData = new vscode.EventEmitter();
+  onDidChangeTreeData = this._onDidChangeTreeData.event;
+  problems = [];
+  progressMap = /* @__PURE__ */ new Map();
+  state = "loading";
+  topicFilter = null;
+  difficultyFilter = null;
+  searchQuery = "";
+  /** Fire a tree refresh without changing data (e.g. triggered by the Refresh button). */
+  refresh() {
+    this._onDidChangeTreeData.fire();
+  }
+  /** Push new problem + progress data and redraw the tree. */
+  setProblems(problems, progress) {
+    this.problems = problems;
+    this.progressMap = new Map(progress.map((p) => [p.problemId, p.status]));
+    this.state = "loaded";
+    this._onDidChangeTreeData.fire();
+  }
+  /** Switch to error state and redraw. */
+  setError() {
+    this.state = "error";
+    this._onDidChangeTreeData.fire();
+  }
+  filterByTopic(topic) {
+    this.topicFilter = topic;
+    this._onDidChangeTreeData.fire();
+  }
+  filterByDifficulty(d) {
+    this.difficultyFilter = d;
+    this._onDidChangeTreeData.fire();
+  }
+  search(query) {
+    this.searchQuery = query;
+    this._onDidChangeTreeData.fire();
+  }
+  getTreeItem(element) {
+    return element;
+  }
+  getChildren(element) {
+    if (element instanceof GroupItem) {
+      return element.children;
+    }
+    if (element instanceof ProblemTreeItem || element instanceof StatusItem) {
+      return [];
+    }
+    if (this.state === "loading") {
+      return [new StatusItem("loading")];
+    }
+    if (this.state === "error") {
+      return [new StatusItem("error")];
+    }
+    let filtered = this.problems.filter((p) => p.isPublished);
+    const topic = this.topicFilter;
+    if (topic !== null) {
+      filtered = filtered.filter((p) => p.topics.includes(topic));
+    }
+    const q = this.searchQuery.toLowerCase();
+    if (q) {
+      filtered = filtered.filter((p) => p.title.toLowerCase().includes(q));
+    }
+    const difficulties = this.difficultyFilter !== null ? [this.difficultyFilter] : ["easy" /* Easy */, "medium" /* Medium */, "hard" /* Hard */];
+    return difficulties.map((diff) => {
+      const items = filtered.filter((p) => p.difficulty === diff).sort((a, b) => a.orderIndex - b.orderIndex).map((p) => new ProblemTreeItem(p, this.progressMap.get(p.id) ?? "unsolved"));
+      return new GroupItem(diff, items);
+    });
+  }
+};
+
+// src/providers/ProblemWebviewProvider.ts
+var vscode2 = __toESM(require("vscode"));
+
 // src/services/api.ts
 var MOCK_MODE = true;
 var API_BASE = "https://api.unsw-practice.com/api/v1";
@@ -272,6 +406,16 @@ async function fetchProblem(slug, token) {
   const json = await response.json();
   return json.data;
 }
+async function fetchUserProgress(token) {
+  if (MOCK_MODE) {
+    return Promise.resolve([]);
+  }
+  const response = await fetchWithRetry(`${API_BASE}/progress`, {
+    headers: authHeaders(token)
+  });
+  const json = await response.json();
+  return json.data;
+}
 async function runCode(code, input, expectedOutput) {
   const fullCode = `${code}
 ${input}`;
@@ -323,70 +467,7 @@ async function submitCode(code, testCases) {
   return { status, testResults, runtimeMs: 0 };
 }
 
-// src/providers/ProblemTreeProvider.ts
-var ProblemItem = class extends vscode.TreeItem {
-  constructor(problem) {
-    super(problem.title, vscode.TreeItemCollapsibleState.None);
-    this.problem = problem;
-    this.description = problem.difficulty;
-    this.tooltip = `${problem.title} \u2014 ${problem.difficulty}`;
-    this.contextValue = "problem";
-    this.command = {
-      command: "unsw-practice.openProblem",
-      title: "Open Problem",
-      arguments: [problem.slug]
-    };
-    const iconMap = {
-      ["easy" /* Easy */]: new vscode.ThemeIcon(
-        "circle-filled",
-        new vscode.ThemeColor("charts.green")
-      ),
-      ["medium" /* Medium */]: new vscode.ThemeIcon(
-        "circle-filled",
-        new vscode.ThemeColor("charts.yellow")
-      ),
-      ["hard" /* Hard */]: new vscode.ThemeIcon(
-        "circle-filled",
-        new vscode.ThemeColor("charts.red")
-      )
-    };
-    this.iconPath = iconMap[problem.difficulty];
-  }
-};
-var ProblemTreeProvider = class {
-  _onDidChangeTreeData = new vscode.EventEmitter();
-  onDidChangeTreeData = this._onDidChangeTreeData.event;
-  problems = [];
-  loaded = false;
-  /**
-   * Reload the problem list from the API and redraw the tree.
-   */
-  async refresh() {
-    try {
-      this.problems = await fetchProblems();
-      this.loaded = true;
-      this._onDidChangeTreeData.fire();
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `UNSW Practice: Failed to load problems \u2014 ${String(error)}`
-      );
-    }
-  }
-  /** Required by TreeDataProvider — returns the item itself. */
-  getTreeItem(element) {
-    return element;
-  }
-  /** Returns root-level children (problems). Lazy-loads on first call. */
-  async getChildren() {
-    if (!this.loaded) {
-      await this.refresh();
-    }
-    return this.problems.map((p) => new ProblemItem(p));
-  }
-};
-
 // src/providers/ProblemWebviewProvider.ts
-var vscode2 = __toESM(require("vscode"));
 var ProblemWebviewProvider = class {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
@@ -599,9 +680,24 @@ function activate(context) {
     treeDataProvider: treeProvider,
     showCollapseAll: false
   });
+  async function loadProblems() {
+    try {
+      const [problems, progress] = await Promise.all([
+        fetchProblems(),
+        fetchUserProgress("")
+      ]);
+      treeProvider.setProblems(problems, progress);
+    } catch (error) {
+      treeProvider.setError();
+      vscode6.window.showErrorMessage(
+        `UNSW Practice: Failed to load problems \u2014 ${String(error)}`
+      );
+    }
+  }
+  void loadProblems();
   const refreshDisposable = vscode6.commands.registerCommand(
     "unsw-practice.refresh",
-    () => void treeProvider.refresh()
+    () => void loadProblems()
   );
   context.subscriptions.push(
     treeView,

@@ -31,8 +31,8 @@ npm run lint           # ESLint 检查
 src/extension.ts          ← 入口：只做组装，零业务逻辑
 src/types/index.ts        ← 唯一数据契约（所有接口/枚举/常量定义在此）
 src/services/             ← 纯业务逻辑，零 VSCode UI 依赖
-  api.ts                  ← fetchProblems / fetchProblem / runCode / submitCode
-  auth.ts                 ← token/user 存储（VSCode API 作为参数注入）
+  api.ts                  ← fetchProblems / fetchProblem(slug) / submitSolution / fetchUserProgress / runCode / submitCode / ApiError
+  auth.ts                 ← createAuthService(secrets) 工厂 + storeUser/getUser/clearUser
 src/providers/
   ProblemTreeProvider.ts  ← 侧边栏题目列表（TreeDataProvider）
   ProblemWebviewProvider.ts ← 做题面板（WebviewPanel + 消息总线）
@@ -60,7 +60,7 @@ TypeScript 配置（`tsconfig.json`）使用 `"module": "Preserve", "moduleResol
 - `ExtensionMessage`：extension → webview（`load-problem` / `run-result` / `submit-result` / `loading`）
 - `WebviewMessage`：webview → extension（`ready` / `run-code` / `submit-code`）
 
-`run-code` 消息携带 `{ code, input, expectedOutput }`；extension 调用 `runCode()` 后 postMessage 回 `TestResult`。`submit-code` 触发 `submitCode(code, problem.testCases)` 返回 `SubmissionResult`。
+`run-code` 消息携带 `{ code, input, expectedOutput }`；extension 调用 `runCode()` 后 postMessage 回 `TestResult`。`submit-code` 触发 `submitCode(code, problem.testCases)` 返回 `SubmissionResult`（WebView 内部流程，不走 `submitSolution`）。
 
 `ProblemWebviewProvider.handleWebviewMessage()` 处理所有入站消息，调用 `api.ts` 中的函数，再 `postMessage` 回 webview。
 
@@ -76,7 +76,9 @@ TypeScript 配置（`tsconfig.json`）使用 `"module": "Preserve", "moduleResol
 
 ### MOCK_MODE
 
-`src/services/api.ts` 顶部有 `const MOCK_MODE = true`。阶段一全程使用本地 mock 数据（5道 COMP9021 题），每道题的 `testCases` 直接嵌入 `Problem` 对象。切换至 `false` 后会调用 `https://api.unsw-practice.com/api/v1`。
+`src/services/api.ts` 顶部有 `export const MOCK_MODE = true`。阶段一全程使用本地 mock 数据（3道 COMP9021 题：`fibonacci` / `stack-implementation` / `bank-account`），每道题的 `testCases` 直接嵌入 `Problem` 对象，按 `slug` 查询。切换至 `false` 后会调用 `https://api.unsw-practice.com/api/v1`。
+
+所有后端调用走 `fetchWithRetry`（10 秒超时 + 2 次网络重试，4xx/5xx 不重试），网络/HTTP 错误统一抛 `ApiError`（含 `statusCode?`）。
 
 ### Monaco Editor
 
@@ -95,8 +97,9 @@ const monacoRequire = (globalThis as Record<string, unknown>)['require'] as Mona
 - **所有 disposable** 必须 push 到 `context.subscriptions`
 - **WebView** 必须有 `nonce` + `CSP header`（见 `ProblemWebviewProvider.buildHtml()`）
 - **错误** 用 `vscode.window.showErrorMessage()` 展示，不 throw 到顶层
-- **`src/services/`** 的函数不得 `import * as vscode from 'vscode'`（可 `import type`），VSCode API 通过参数注入
+- **`src/services/`** 的函数不得 `import * as vscode from 'vscode'`（可 `import type`），VSCode API 通过参数注入；`auth.ts` 用 `createAuthService(secrets)` 工厂注入一次，而非每次调用传参
 - **`src/commands/`** 每个文件导出一个 `register*()` 函数，返回 `vscode.Disposable`，在 `extension.ts` 统一注册
+- **`openProblem` 命令** 接收 `slug`（非 `id`）；`ProblemItem` 的 `command.arguments` 传 `problem.slug`
 
 ---
 
@@ -110,3 +113,5 @@ const monacoRequire = (globalThis as Record<string, unknown>)['require'] as Mona
 | 业务逻辑全部在后端，插件是纯客户端 | 阶段二网页版可直接复用后端 |
 
 不需要提前实现阶段二三功能，但数据结构和接口设计不能挡路。遇到方案选择时：选扩展性好的简单方案。
+
+

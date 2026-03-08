@@ -5,6 +5,7 @@ import { registerOpenProblem } from './commands/openProblem';
 import { registerSubmitCode } from './commands/submitCode';
 import { registerLogin } from './commands/login';
 import { createAuthService } from './services/auth';
+import { fetchProblems, fetchUserProgress } from './services/api';
 
 /**
  * Extension entry point.
@@ -25,10 +26,28 @@ export function activate(context: vscode.ExtensionContext): void {
     showCollapseAll: false,
   });
 
+  // ── Data loading ───────────────────────────────────────────────────────────
+  async function loadProblems(): Promise<void> {
+    try {
+      const [problems, progress] = await Promise.all([
+        fetchProblems(),
+        fetchUserProgress(''),
+      ]);
+      treeProvider.setProblems(problems, progress);
+    } catch (error) {
+      treeProvider.setError();
+      vscode.window.showErrorMessage(
+        `UNSW Practice: Failed to load problems — ${String(error)}`,
+      );
+    }
+  }
+
+  void loadProblems();
+
   // ── Commands ───────────────────────────────────────────────────────────────
   const refreshDisposable = vscode.commands.registerCommand(
     'unsw-practice.refresh',
-    () => void treeProvider.refresh(),
+    () => void loadProblems(),
   );
 
   // ── Register everything ────────────────────────────────────────────────────

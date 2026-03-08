@@ -1,15 +1,36 @@
 import * as vscode from 'vscode';
-import type { Problem } from '../types/index';
+import type { Problem, UserProgress } from '../types/index';
 import { Difficulty } from '../types/index';
-import { fetchProblems } from '../services/api';
 
-/** A single row in the Problems tree view. */
-export class ProblemItem extends vscode.TreeItem {
-  constructor(public readonly problem: Problem) {
-    super(problem.title, vscode.TreeItemCollapsibleState.None);
+type ProgressStatus = 'unsolved' | 'attempted' | 'solved';
 
-    this.description = problem.difficulty;
-    this.tooltip = `${problem.title} — ${problem.difficulty}`;
+const DIFFICULTY_PREFIX: Record<Difficulty, string> = {
+  [Difficulty.Easy]: '[E]',
+  [Difficulty.Medium]: '[M]',
+  [Difficulty.Hard]: '[H]',
+};
+
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  [Difficulty.Easy]: '🟢 Easy',
+  [Difficulty.Medium]: '🟡 Medium',
+  [Difficulty.Hard]: '🔴 Hard',
+};
+
+/** A single problem row in the tree. */
+export class ProblemTreeItem extends vscode.TreeItem {
+  readonly status: ProgressStatus;
+
+  constructor(
+    public readonly problem: Problem,
+    status: ProgressStatus,
+  ) {
+    super(
+      `${DIFFICULTY_PREFIX[problem.difficulty]} #${problem.orderIndex}  ${problem.title}`,
+      vscode.TreeItemCollapsibleState.None,
+    );
+    this.status = status;
+    this.description = problem.topics.join(' · ');
+    this.tooltip = problem.description.slice(0, 120);
     this.contextValue = 'problem';
     this.command = {
       command: 'unsw-practice.openProblem',
@@ -17,62 +38,139 @@ export class ProblemItem extends vscode.TreeItem {
       arguments: [problem.slug],
     };
 
-    const iconMap: Record<Difficulty, vscode.ThemeIcon> = {
-      [Difficulty.Easy]: new vscode.ThemeIcon(
-        'circle-filled',
-        new vscode.ThemeColor('charts.green'),
-      ),
-      [Difficulty.Medium]: new vscode.ThemeIcon(
-        'circle-filled',
+    const iconMap: Record<ProgressStatus, vscode.ThemeIcon> = {
+      solved: new vscode.ThemeIcon('pass-filled', new vscode.ThemeColor('testing.iconPassed')),
+      attempted: new vscode.ThemeIcon(
+        'circle-large-outline',
         new vscode.ThemeColor('charts.yellow'),
       ),
-      [Difficulty.Hard]: new vscode.ThemeIcon(
-        'circle-filled',
-        new vscode.ThemeColor('charts.red'),
-      ),
+      unsolved: new vscode.ThemeIcon('circle-outline'),
     };
-    this.iconPath = iconMap[problem.difficulty];
+    this.iconPath = iconMap[status];
   }
 }
 
+/** A collapsible difficulty group (Easy / Medium / Hard). */
+export class GroupItem extends vscode.TreeItem {
+  readonly children: ProblemTreeItem[];
+
+  constructor(difficulty: Difficulty, children: ProblemTreeItem[]) {
+    const solvedCount = children.filter((c) => c.status === 'solved').length;
+    super(
+      `${DIFFICULTY_LABEL[difficulty]} (${solvedCount} solved / ${children.length} total)`,
+      vscode.TreeItemCollapsibleState.Expanded,
+    );
+    this.children = children;
+    this.contextValue = 'group';
+  }
+}
+
+/** Placeholder shown while loading or on error. */
+class StatusItem extends vscode.TreeItem {
+  constructor(kind: 'loading' | 'error') {
+    if (kind === 'loading') {
+      super('Loading problems...', vscode.TreeItemCollapsibleState.None);
+      this.iconPath = new vscode.ThemeIcon('loading~spin');
+    } else {
+      super('⚠ Failed to load — click Refresh', vscode.TreeItemCollapsibleState.None);
+    }
+  }
+}
+
+type TreeNode = GroupItem | ProblemTreeItem | StatusItem;
+
 /**
  * Provides the "Problems" tree view in the UNSW Practice activity bar panel.
- * Fetches problems from the API and re-renders on refresh.
+ * Data is pushed in via setProblems(); does not fetch on its own.
  */
-export class ProblemTreeProvider implements vscode.TreeDataProvider<ProblemItem> {
-  private readonly _onDidChangeTreeData = new vscode.EventEmitter<
-    ProblemItem | undefined | void
-  >();
+export class ProblemTreeProvider implements vscode.TreeDataProvider<TreeNode> {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<TreeNode | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private problems: Problem[] = [];
-  private loaded = false;
+  private progressMap = new Map<string, ProgressStatus>();
+  private state: 'loading' | 'error' | 'loaded' = 'loading';
+  private topicFilter: string | null = null;
+  private difficultyFilter: Difficulty | null = null;
+  private searchQuery = '';
 
-  /**
-   * Reload the problem list from the API and redraw the tree.
-   */
-  async refresh(): Promise<void> {
-    try {
-      this.problems = await fetchProblems();
-      this.loaded = true;
-      this._onDidChangeTreeData.fire();
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `UNSW Practice: Failed to load problems — ${String(error)}`,
-      );
-    }
+  /** Fire a tree refresh without changing data (e.g. triggered by the Refresh button). */
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
   }
 
-  /** Required by TreeDataProvider — returns the item itself. */
-  getTreeItem(element: ProblemItem): vscode.TreeItem {
+  /** Push new problem + progress data and redraw the tree. */
+  setProblems(problems: Problem[], progress: UserProgress[]): void {
+    this.problems = problems;
+    this.progressMap = new Map(progress.map((p) => [p.problemId, p.status]));
+    this.state = 'loaded';
+    this._onDidChangeTreeData.fire();
+  }
+
+  /** Switch to error state and redraw. */
+  setError(): void {
+    this.state = 'error';
+    this._onDidChangeTreeData.fire();
+  }
+
+  filterByTopic(topic: string | null): void {
+    this.topicFilter = topic;
+    this._onDidChangeTreeData.fire();
+  }
+
+  filterByDifficulty(d: Difficulty | null): void {
+    this.difficultyFilter = d;
+    this._onDidChangeTreeData.fire();
+  }
+
+  search(query: string): void {
+    this.searchQuery = query;
+    this._onDidChangeTreeData.fire();
+  }
+
+  getTreeItem(element: TreeNode): vscode.TreeItem {
     return element;
   }
 
-  /** Returns root-level children (problems). Lazy-loads on first call. */
-  async getChildren(): Promise<ProblemItem[]> {
-    if (!this.loaded) {
-      await this.refresh();
+  getChildren(element?: TreeNode): TreeNode[] {
+    if (element instanceof GroupItem) {
+      return element.children;
     }
-    return this.problems.map((p) => new ProblemItem(p));
+    if (element instanceof ProblemTreeItem || element instanceof StatusItem) {
+      return [];
+    }
+
+    // Root level
+    if (this.state === 'loading') {
+      return [new StatusItem('loading')];
+    }
+    if (this.state === 'error') {
+      return [new StatusItem('error')];
+    }
+
+    let filtered = this.problems.filter((p) => p.isPublished);
+
+    const topic = this.topicFilter;
+    if (topic !== null) {
+      filtered = filtered.filter((p) => p.topics.includes(topic));
+    }
+
+    const q = this.searchQuery.toLowerCase();
+    if (q) {
+      filtered = filtered.filter((p) => p.title.toLowerCase().includes(q));
+    }
+
+    const difficulties =
+      this.difficultyFilter !== null
+        ? [this.difficultyFilter]
+        : [Difficulty.Easy, Difficulty.Medium, Difficulty.Hard];
+
+    return difficulties.map((diff) => {
+      const items = filtered
+        .filter((p) => p.difficulty === diff)
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((p) => new ProblemTreeItem(p, this.progressMap.get(p.id) ?? 'unsolved'));
+      return new GroupItem(diff, items);
+    });
   }
 }
