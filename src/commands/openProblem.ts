@@ -4,7 +4,7 @@ import { fetchProblem } from '../services/api';
 
 /**
  * Register the `unsw-practice.openProblem` command.
- * Accepts a problem ID as its first argument (passed by ProblemItem.command).
+ * Accepts a problem slug as its first argument (passed by ProblemTreeItem.command).
  * Fetches the full problem data and hands it to the WebView provider.
  */
 export function registerOpenProblem(
