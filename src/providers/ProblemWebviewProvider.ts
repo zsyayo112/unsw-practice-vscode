@@ -117,10 +117,10 @@ export class ProblemWebviewProvider {
     http-equiv="Content-Security-Policy"
     content="
       default-src 'none';
-      style-src ${webview.cspSource} 'unsafe-inline';
-      script-src 'nonce-${nonce}' https://cdn.jsdelivr.net;
-      font-src ${webview.cspSource};
-      connect-src https://emkc.org;
+      style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+      script-src 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+      font-src ${webview.cspSource} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+      connect-src ${webview.cspSource} https://emkc.org https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
     "
   />
   <link rel="stylesheet" href="${cssUri}" />
